@@ -10,6 +10,7 @@ type TournamentContextValue = {
   dirty: boolean;
   notice: string;
   save: () => Promise<void>;
+  localBackupReady: boolean;
 };
 
 // Keep context identity outside the refreshable provider component module.

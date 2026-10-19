@@ -88,11 +88,13 @@ export function writeLocalTournamentBackup(
   ownerId: string | null,
   state: TournamentState,
   savedAt = new Date().toISOString(),
-): void {
-  if (typeof window === 'undefined') return;
+): boolean {
+  if (typeof window === 'undefined') return false;
   try {
     window.localStorage.setItem(localStorageKey(ownerId), JSON.stringify(createTournamentBackup(state, savedAt)));
+    return true;
   } catch {
     // The downloadable JSON backup remains available if browser storage is unavailable or full.
+    return false;
   }
 }

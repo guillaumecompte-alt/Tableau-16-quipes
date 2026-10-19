@@ -741,3 +741,54 @@ input:focus-visible {
   .wheel-live-dot { animation: none !important; }
   .wheel-progress-track > span { transition: none !important; }
 }
+
+
+/* Sauvegarde locale du tournoi et restauration depuis un fichier. */
+.topbar-actions { min-width: 0; }
+.topbar-actions .save-status { max-width: 210px; }
+.backup-action,
+.save-cloud-action {
+  gap: 6px;
+  white-space: nowrap;
+  border-color: #cbd9e9;
+  color: #174d86;
+  background: #fff;
+}
+.backup-action:hover,
+.save-cloud-action:hover {
+  border-color: #8db5de;
+  background: #f1f7fe;
+  color: #09254a;
+}
+.backup-action svg,
+.save-cloud-action svg { flex-shrink: 0; }
+.backup-feedback {
+  margin: 12px 32px 0;
+  border: 1px solid #d7e7f5;
+  border-left: 4px solid #1265b5;
+  border-radius: 7px;
+  padding: 10px 13px;
+  background: #f2f8ff;
+  color: #153e6b;
+  font-size: 11px;
+  line-height: 1.5;
+}
+@media (max-width: 900px) {
+  .topbar-actions { gap: 6px !important; }
+  .topbar-actions .save-status { max-width: 130px; font-size: 9px; }
+  .backup-action, .save-cloud-action { padding-inline: 8px; }
+}
+@media (max-width: 620px) {
+  .topbar { gap: 7px; }
+  .topbar-actions { gap: 5px !important; }
+  .topbar-actions .save-status { display: none; }
+  .backup-action, .save-cloud-action {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 !important;
+    justify-content: center;
+  }
+  .backup-action-label, .save-button-label { display: none; }
+  .backup-feedback { margin: 10px 16px 0; }
+}
