@@ -1,0 +1,13 @@
+node_modules/
+dist/
+dist-desktop/
+desktop-package/
+release/
+coverage/
+.output/
+.vinxi/
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
