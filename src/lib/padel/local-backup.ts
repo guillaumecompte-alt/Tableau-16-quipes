@@ -5,11 +5,13 @@ export type TournamentBackup = {
   version: 1;
   savedAt: string;
   state: TournamentState;
+  ownerId?: string | null;
 };
 
 const BACKUP_FORMAT = 'ze-padel-tournament-backup';
 const BACKUP_VERSION = 1;
 const MAX_BACKUP_BYTES = 5 * 1024 * 1024;
+const DEVICE_BACKUP_KEY = 'ze-padel:tournament-backup:v1:device';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -75,13 +77,22 @@ function localStorageKey(ownerId: string | null): string {
 
 export function readLocalTournamentBackup(ownerId: string | null): TournamentBackup | null {
   if (typeof window === 'undefined') return null;
-  try {
-    const value = window.localStorage.getItem(localStorageKey(ownerId));
-    if (!value) return null;
-    return parseTournamentBackup(value);
-  } catch {
-    return null;
+
+  const candidates: TournamentBackup[] = [];
+  for (const key of [localStorageKey(ownerId), DEVICE_BACKUP_KEY]) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = parseTournamentBackup(raw);
+      // When signed in, do not accidentally load another account's device copy.
+      if (key === DEVICE_BACKUP_KEY && ownerId && parsed.ownerId !== ownerId) continue;
+      candidates.push(parsed);
+    } catch {
+      // Ignore one corrupt local copy; the other copy may still be usable.
+    }
   }
+
+  return candidates.sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt))[0] ?? null;
 }
 
 export function writeLocalTournamentBackup(
@@ -90,11 +101,16 @@ export function writeLocalTournamentBackup(
   savedAt = new Date().toISOString(),
 ): boolean {
   if (typeof window === 'undefined') return false;
-  try {
-    window.localStorage.setItem(localStorageKey(ownerId), JSON.stringify(createTournamentBackup(state, savedAt)));
-    return true;
-  } catch {
-    // The downloadable JSON backup remains available if browser storage is unavailable or full.
-    return false;
+  const backup = { ...createTournamentBackup(state, savedAt), ownerId };
+  const serialized = JSON.stringify(backup);
+  let wroteAtLeastOneCopy = false;
+  for (const key of [localStorageKey(ownerId), DEVICE_BACKUP_KEY]) {
+    try {
+      window.localStorage.setItem(key, serialized);
+      wroteAtLeastOneCopy = true;
+    } catch {
+      // Keep trying the second key; the downloadable JSON remains the safest extra copy.
+    }
   }
+  return wroteAtLeastOneCopy;
 }
