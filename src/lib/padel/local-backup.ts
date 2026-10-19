@@ -32,8 +32,8 @@ export function isTournamentState(value: unknown): value is TournamentState {
     if (!(typeof team.ranking2 === 'string' || typeof team.ranking2 === 'number')) return false;
     if (typeof team.time !== 'string') return false;
   }
-  for (const value of Object.values(value.draw)) {
-    if (!Number.isInteger(value) || Number(value) < 1 || Number(value) > 16) return false;
+  for (const rank of Object.values(value.draw)) {
+    if (!Number.isInteger(rank) || Number(rank) < 1 || Number(rank) > 16) return false;
   }
   for (const [matchId, result] of Object.entries(value.results)) {
     if (!/^(?:[1-9]|1\d|2[0-8])$/.test(matchId) || (result !== 0 && result !== 1)) return false;
