@@ -1,7 +1,6 @@
-const { app, BrowserWindow, Menu, net, protocol } = require('electron');
+const { app, BrowserWindow, Menu, protocol } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { pathToFileURL } = require('node:url');
 
 const APP_SCHEME = 'app';
 const APP_HOST = 'ze-padel';
@@ -20,6 +19,29 @@ protocol.registerSchemesAsPrivileged([
 
 function getBuildDirectory() {
   return path.resolve(__dirname, '..', 'dist-desktop');
+}
+
+function contentType(filePath) {
+  const extension = path.extname(filePath).toLowerCase();
+  const types = {
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'text/javascript; charset=utf-8',
+    '.mjs': 'text/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+    '.ico': 'image/x-icon',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.ttf': 'font/ttf',
+    '.otf': 'font/otf',
+  };
+  return types[extension] || 'application/octet-stream';
 }
 
 async function serveLocalApp(request) {
@@ -42,8 +64,15 @@ async function serveLocalApp(request) {
   }
 
   try {
-    await fs.access(resolved);
-    return await net.fetch(pathToFileURL(resolved).href);
+    const contents = await fs.readFile(resolved);
+    return new Response(contents, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType(resolved),
+        'X-Content-Type-Options': 'nosniff',
+        'Cache-Control': 'no-store',
+      },
+    });
   } catch {
     return new Response('Not found', { status: 404 });
   }
@@ -80,7 +109,7 @@ function createWindow() {
 
 app.setAppUserModelId('fr.zepadel.desktop');
 
-app.whenReady().then(async () => {
+app.whenReady().then(() => {
   protocol.handle(APP_SCHEME, serveLocalApp);
   Menu.setApplicationMenu(null);
   createWindow();
