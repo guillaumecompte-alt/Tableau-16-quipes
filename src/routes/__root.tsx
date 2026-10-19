@@ -79,14 +79,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Padel Board · Tournois de padel" },
-      { name: "description", content: "Vos tournois de padel, du tirage au classement final." },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Padel Board" },
-      { property: "og:description", content: "Du tirage au classement final de votre tournoi de padel." },
+      { title: "ZE PADEL · Gestion des tournois" },
+      { name: "description", content: "Gestion du tournoi ZE PADEL : équipes, tirage au sort et classement final." },
+      { name: "author", content: "ZE PADEL" },
+      { property: "og:title", content: "ZE PADEL · Gestion des tournois" },
+      { property: "og:description", content: "Les équipes, le tirage au sort et les résultats de votre tournoi ZE PADEL." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
+      
     ],
     links: [
       {
