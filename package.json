@@ -1,5 +1,5 @@
 {
-  "name": "tanstack_start_ts",
+  "name": "ze-padel",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -11,7 +11,12 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "desktop:dev": "vite --config vite.desktop.config.ts --host 127.0.0.1",
+    "desktop:build": "vite build --config vite.desktop.config.ts",
+    "desktop:run": "npm run desktop:build && electron .",
+    "desktop:stage": "node scripts/stage-desktop.cjs",
+    "desktop:dist": "npm run desktop:build && npm run desktop:stage && electron-builder --win nsis --x64"
   },
   "overrides": {
     "rolldown": "1.2.1"
@@ -97,6 +102,42 @@
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
     "vite": "8.1.5",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
+  },
+  "version": "1.0.0",
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "fr.zepadel.desktop",
+    "productName": "ZE PADEL",
+    "directories": {
+      "app": "desktop-package",
+      "output": "release"
+    },
+    "files": [
+      "dist-desktop/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "ZE-PADEL-Setup-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ZE PADEL"
+    }
   }
 }
