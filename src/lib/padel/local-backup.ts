@@ -85,7 +85,7 @@ export function readLocalTournamentBackup(ownerId: string | null): TournamentBac
       if (!raw) continue;
       const parsed = parseTournamentBackup(raw);
       // When signed in, do not accidentally load another account's device copy.
-      if (key === DEVICE_BACKUP_KEY && ownerId && parsed.ownerId !== ownerId) continue;
+      if (key === DEVICE_BACKUP_KEY && parsed.ownerId !== ownerId) continue;
       candidates.push(parsed);
     } catch {
       // Ignore one corrupt local copy; the other copy may still be usable.
