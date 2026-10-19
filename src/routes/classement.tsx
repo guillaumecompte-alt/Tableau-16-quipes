@@ -4,8 +4,8 @@ import { TournamentShell } from '@/components/padel/tournament-shell';
 import { useTournament } from '@/components/padel/use-tournament';
 import { points, standings } from '@/lib/padel/tournament';
 export const Route = createFileRoute('/classement')({ head: () => ({ meta: [
-  { title: 'Classement P100 Ze Padel | Padel Board' }, { name: 'description', content: 'Classement final des 16 équipes et points du tournoi P100 Ze Padel.' },
-  { property: 'og:title', content: 'Classement · P100 Ze Padel' }, { property: 'og:description', content: 'Résultats et points du tournoi de padel à 16 équipes.' }, { property: 'og:type', content: 'website' }, { name: 'twitter:card', content: 'summary_large_image' },
+  { title: 'ZE PADEL · Classement P100' }, { name: 'description', content: 'Classement final des 16 équipes et points du tournoi P100 Ze Padel.' },
+  { property: 'og:title', content: 'ZE PADEL · Classement P100' }, { property: 'og:description', content: 'Résultats et points du tournoi de padel à 16 équipes.' }, { property: 'og:type', content: 'website' }, { name: 'twitter:card', content: 'summary_large_image' },
 ] }), component: StandingsPage });
 function StandingsPage() {
   const { state } = useTournament(); const rows = standings(state);
