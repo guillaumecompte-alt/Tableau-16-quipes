@@ -42,6 +42,5 @@ export function TournamentShell({ children }: { children: ReactNode }) {
       {children}
       <footer className="app-footer"><span>Ze Padel · P100 · 16 équipes</span><span>Entrée échelonnée <ArrowUpRight size={13} /></span></footer></main>
     </div>
-}
   </div>;
 }
