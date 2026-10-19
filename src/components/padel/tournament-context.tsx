@@ -9,7 +9,7 @@ import { TournamentContext } from './use-tournament';
 export function TournamentProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState(initialState);
   const [user, setUser] = useState<User | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [dirty, setDirty] = useState(false);
   const [notice, setNotice] = useState('');
   const [localBackupReady, setLocalBackupReady] = useState(false);
