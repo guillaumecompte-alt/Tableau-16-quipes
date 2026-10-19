@@ -16,7 +16,7 @@
     "desktop:build": "vite build --config vite.desktop.config.ts",
     "desktop:run": "npm run desktop:build && npx --yes electron@44.9.0 .",
     "desktop:stage": "node scripts/stage-desktop.cjs",
-    "desktop:dist": "npm run desktop:build && npm run desktop:stage && npx --yes electron-builder@26.15.3 --win nsis --x64"
+    "desktop:dist": "npm run desktop:build && npm run desktop:stage && npx --yes electron-builder@26.15.3 --win nsis --x64 --publish never"
   },
   "overrides": {
     "rolldown": "1.2.1"
