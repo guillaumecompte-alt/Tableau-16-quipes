@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { isTeamComplete, type Team } from '@/lib/padel/tournament';
 import { TeamImportDialog } from '@/components/padel/team-import-dialog';
 export const Route = createFileRoute('/equipes')({ head: () => ({ meta: [
-  { title: 'Équipes du P100 Ze Padel | Padel Board' }, { name: 'description', content: 'Les 16 équipes du tournoi, leurs rangs, classements et convocations.' },
-  { property: 'og:title', content: 'Équipes · P100 Ze Padel' }, { property: 'og:description', content: 'Participants et têtes de série du tournoi de padel.' }, { property: 'og:type', content: 'website' }, { name: 'twitter:card', content: 'summary_large_image' },
+  { title: 'ZE PADEL · Équipes du P100' }, { name: 'description', content: 'Les 16 équipes du tournoi, leurs rangs, classements et convocations.' },
+  { property: 'og:title', content: 'ZE PADEL · Équipes du P100' }, { property: 'og:description', content: 'Participants et têtes de série du tournoi de padel.' }, { property: 'og:type', content: 'website' }, { name: 'twitter:card', content: 'summary_large_image' },
 ] }), component: TeamsPage });
 function TeamsPage() {
   const { state, update, busy } = useTournament(); const [search, setSearch] = useState(''); const [editing, setEditing] = useState<Team | null>(null);
