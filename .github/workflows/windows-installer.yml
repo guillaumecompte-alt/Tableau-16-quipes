@@ -1,0 +1,53 @@
+name: Build ZE PADEL Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'electron/**'
+      - 'scripts/**'
+      - 'desktop.html'
+      - 'vite.desktop.config.ts'
+      - 'package.json'
+      - '.github/workflows/windows-installer.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ze-padel-windows-installer
+  cancel-in-progress: true
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-package-lock
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Windows installer
+        run: npm run desktop:dist
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZE-PADEL-Windows-Installer
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 30
