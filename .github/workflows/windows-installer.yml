@@ -15,7 +15,7 @@ on:
       - '.github/workflows/windows-installer.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ze-padel-windows-installer
@@ -50,3 +50,15 @@ jobs:
           path: release/*.exe
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish or update the downloadable Windows installer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view desktop-v1.0.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload desktop-v1.0.0 release/*.exe --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit desktop-v1.0.0 --repo "$GITHUB_REPOSITORY" --title "ZE PADEL — Application Windows" --notes "Installateur Windows autonome de ZE PADEL. L'application fonctionne localement sans compte ni connexion Internet. Version construite depuis le commit $GITHUB_SHA."
+          else
+            gh release create desktop-v1.0.0 release/*.exe --repo "$GITHUB_REPOSITORY" --target "$GITHUB_REF_NAME" --title "ZE PADEL — Application Windows" --notes "Installateur Windows autonome de ZE PADEL. L'application fonctionne localement sans compte ni connexion Internet. Version construite depuis le commit $GITHUB_SHA."
+          fi
