@@ -10,6 +10,7 @@ type TournamentContextValue = {
   dirty: boolean;
   notice: string;
   save: () => Promise<void>;
+  restoreState: (state: TournamentState) => Promise<{ localSaved: boolean; onlineSaved: boolean }>;
   localBackupReady: boolean;
 };
 

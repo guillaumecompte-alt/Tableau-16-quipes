@@ -6,10 +6,10 @@ import { lovable } from '@/integrations/lovable';
 import { supabase } from '@/integrations/supabase/client';
 import { useTournament } from './use-tournament';
 import court from '@/assets/padel-court.jpg';
-import { parseTournamentBackup, serializeTournamentBackup, writeLocalTournamentBackup } from '@/lib/padel/local-backup';
+import { parseTournamentBackup, serializeTournamentBackup } from '@/lib/padel/local-backup';
 
 export function TournamentShell({ children }: { children: ReactNode }) {
-  const { state, update, user, save, busy, dirty, notice, localBackupReady } = useTournament();
+  const { state, user, save, restoreState, busy, dirty, notice, localBackupReady } = useTournament();
   const [login, setLogin] = useState(false); const [authError, setAuthError] = useState('');
   const [backupFeedback, setBackupFeedback] = useState('');
   const backupInput = useRef<HTMLInputElement>(null);
@@ -29,12 +29,16 @@ export function TournamentShell({ children }: { children: ReactNode }) {
         <Button type="button" variant="outline" size="sm" className="backup-action" disabled={busy} title="Télécharger une sauvegarde sur ce PC" aria-label="Télécharger une sauvegarde sur ce PC" onClick={() => { try { const blob = new Blob([serializeTournamentBackup(state)], { type: 'application/json;charset=utf-8' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `ze-padel-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`; document.body.appendChild(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); setBackupFeedback('Sauvegarde téléchargée sur le PC. Garde ce fichier dans un endroit sûr.'); } catch { setBackupFeedback('Le téléchargement de la sauvegarde a échoué. Réessaie ou vérifie les paramètres du navigateur.'); } }}><Download size={15} /><span className="backup-action-label">Copie sur PC</span></Button>
         <Button type="button" variant="outline" size="sm" className="backup-action" disabled={busy} title="Restaurer une sauvegarde depuis ce PC" aria-label="Restaurer une sauvegarde depuis ce PC" onClick={() => backupInput.current?.click()}><Upload size={15} /><span className="backup-action-label">Restaurer</span></Button>
         <input ref={backupInput} className="hidden" type="file" accept=".json,application/json" aria-label="Fichier de sauvegarde ZE PADEL" onChange={async event => { const file = event.target.files?.[0]; if (!file) return; setBackupFeedback(''); try { const backup = parseTournamentBackup(await file.text()); const date = new Date(backup.savedAt).toLocaleString('fr-FR'); const confirmed = window.confirm(`Restaurer la sauvegarde du ${date} ? Cela remplacera les équipes, le tirage et les résultats actuellement affichés. Une copie locale sera créée immédiatement.`); if (confirmed) {
-      const localSaved = writeLocalTournamentBackup(user?.id ?? null, backup.state, new Date().toISOString());
-      update(backup.state);
+      setBackupFeedback('Restauration en cours…');
+      const outcome = await restoreState(backup.state);
+      const teamCount = backup.state.teams.length;
       const drawCount = Object.keys(backup.state.draw).length;
-      setBackupFeedback(localSaved
-        ? `Sauvegarde restaurée : ${backup.state.teams.length} équipes et ${drawCount} affectations de tirage récupérées. La copie locale est enregistrée ; clique sur « Enregistrer en ligne » pour la synchroniser.`
-        : 'Les données ont été restaurées à l’écran, mais le navigateur n’a pas pu les enregistrer localement. Télécharge immédiatement une nouvelle copie JSON.');
+      const syncText = outcome.onlineSaved
+        ? ' Le tournoi est aussi synchronisé en ligne.'
+        : outcome.localSaved
+          ? ' Une copie locale est conservée ; vérifie le message de synchronisation.'
+          : ' Attention : le navigateur n’a pas pu conserver la copie locale, garde le fichier téléchargé.';
+      setBackupFeedback(`Sauvegarde restaurée : ${teamCount} équipes et ${drawCount} affectations de tirage récupérées.${syncText}`);
     } } catch (error) { setBackupFeedback(error instanceof Error ? error.message : 'Impossible de lire ce fichier de sauvegarde.'); } finally { if (backupInput.current) backupInput.current.value = ''; } }} />
         <Button type="button" variant="outline" size="sm" className="save-cloud-action" disabled={busy || (!user && false)} title={user ? 'Enregistrer le tournoi en ligne' : 'Se connecter pour enregistrer en ligne'} aria-label={user ? 'Enregistrer le tournoi en ligne' : 'Se connecter pour enregistrer en ligne'} onClick={() => user ? void save() : setLogin(true)}><Save size={15} /><span className="save-button-label">{user ? 'Enregistrer en ligne' : 'Se connecter'}</span></Button>
       </div></header>

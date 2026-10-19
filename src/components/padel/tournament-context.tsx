@@ -129,6 +129,53 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     setNotice(localSaved ? '' : 'La sauvegarde automatique du navigateur est indisponible. Télécharge une copie JSON sur le PC pour sécuriser le tournoi.');
   };
 
+  async function restoreState(next: TournamentState): Promise<{ localSaved: boolean; onlineSaved: boolean }> {
+    const savedAt = new Date().toISOString();
+    setState(next);
+    setDirty(true);
+    const localSaved = writeLocalTournamentBackup(user?.id ?? null, next, savedAt);
+    setLocalBackupReady(localSaved);
+    setNotice(localSaved ? '' : 'La restauration est affichée, mais la copie locale n’a pas pu être écrite.');
+
+    if (!user) {
+      setNotice(localSaved
+        ? 'Sauvegarde restaurée sur ce PC. Connecte-toi puis enregistre en ligne pour la synchroniser.'
+        : 'Sauvegarde restaurée à l’écran, mais impossible de la conserver dans le navigateur. Télécharge immédiatement une copie JSON.');
+      return { localSaved, onlineSaved: false };
+    }
+
+    setBusy(true);
+    try {
+      const { error } = await supabase.from('padel_tournaments').upsert({
+        owner_id: user.id,
+        state: next as unknown as Json,
+        updated_at: savedAt,
+      }, { onConflict: 'owner_id' });
+
+      if (error) {
+        setDirty(true);
+        setNotice(localSaved
+          ? 'Sauvegarde restaurée localement, mais la synchronisation en ligne a échoué. Vérifie la connexion puis réessaie « Enregistrer en ligne ».'
+          : 'La restauration est affichée, mais la conservation locale et la sauvegarde en ligne ont échoué. Télécharge une copie JSON immédiatement.');
+        return { localSaved, onlineSaved: false };
+      }
+
+      setDirty(false);
+      const mirrored = writeLocalTournamentBackup(user.id, next, savedAt);
+      setLocalBackupReady(mirrored);
+      setNotice('Sauvegarde restaurée et enregistrée en ligne' + (mirrored ? ' et sur ce PC.' : '. Attention : la copie locale n’a pas pu être écrite.'));
+      return { localSaved: localSaved || mirrored, onlineSaved: true };
+    } catch {
+      setDirty(true);
+      setNotice(localSaved
+        ? 'Sauvegarde restaurée localement, mais la connexion à Supabase a échoué. Réessaie « Enregistrer en ligne ».'
+        : 'La restauration est affichée, mais elle n’a pas pu être conservée. Télécharge une copie JSON immédiatement.');
+      return { localSaved, onlineSaved: false };
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function save() {
     if (!user || busy) return;
     setBusy(true);
@@ -154,7 +201,7 @@ export function TournamentProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  return <TournamentContext.Provider value={{ state, update, user, busy, dirty, notice, save, localBackupReady }}>
+  return <TournamentContext.Provider value={{ state, update, user, busy, dirty, notice, save, restoreState, localBackupReady }}>
     {children}
   </TournamentContext.Provider>;
 }
