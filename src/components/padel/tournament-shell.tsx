@@ -15,7 +15,7 @@ export function TournamentShell({ children }: { children: ReactNode }) {
   async function signIn(provider: 'google' | 'lovable') { const result = await lovable.auth.signInWithOAuth(provider, { redirect_uri: window.location.origin }); if (result.error) setAuthError('Connexion impossible. Veuillez réessayer.'); else setLogin(false); }
   return <div className="app-layout">
     <aside className="app-sidebar">
-      <Link to="/" className="brand"><span className="brand-symbol"><CircleDot size={24} /></span><span>padel<span className="text-lime">.</span>board<small>LE TOURNOI, SIMPLEMENT.</small></span></Link>
+      <Link to="/" className="brand"><span className="brand-symbol"><CircleDot size={24} /></span><span>ZE <span className="text-lime">PADEL</span><small>GESTION DES TOURNOIS</small></span></Link>
       <div className="sidebar-label">VOTRE TOURNOI</div>
       <div className="sidebar-tournament"><div className="flex items-center gap-2"><span className="live-dot" /> P100 · Ze Padel</div><span>TMC 16 · Entrée échelonnée</span></div>
       <nav>{nav.map(item => <Button key={item.to} asChild variant="ghost" className={`nav-item ${path === item.to ? 'nav-active' : ''}`}><Link to={item.to}><item.icon size={18} />{item.title}{item.to === '/equipes' && <span className="nav-count">16</span>}</Link></Button>)}</nav>
