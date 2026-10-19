@@ -1,16 +1,13 @@
 import { createContext, useContext } from 'react';
-import type { User } from '@supabase/supabase-js';
 import type { TournamentState } from '@/lib/padel/tournament';
 
 type TournamentContextValue = {
   state: TournamentState;
   update: (state: TournamentState) => void;
-  user: User | null;
   busy: boolean;
   dirty: boolean;
   notice: string;
-  save: () => Promise<void>;
-  restoreState: (state: TournamentState) => Promise<{ localSaved: boolean; onlineSaved: boolean }>;
+  restoreState: (state: TournamentState) => Promise<{ localSaved: boolean }>;
   localBackupReady: boolean;
 };
 
