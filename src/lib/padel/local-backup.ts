@@ -20,6 +20,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function isTournamentState(value: unknown): value is TournamentState {
   if (!isRecord(value) || !Array.isArray(value.teams) || value.teams.length !== 16) return false;
   if (!isRecord(value.draw) || !isRecord(value.results)) return false;
+  if (value.info !== undefined) {
+    if (!isRecord(value.info)) return false;
+    for (const key of ['tournamentType', 'date', 'referee']) {
+      if (typeof value.info[key] !== 'string') return false;
+    }
+  }
 
   const ranks = new Set<number>();
   for (const item of value.teams) {

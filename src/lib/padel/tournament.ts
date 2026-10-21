@@ -2,7 +2,8 @@ import importedTeams from './teams.json';
 
 export type Team = { rank: number; player1: string; player2: string; ranking1: number | string; ranking2: number | string; email1?: string; email2?: string; time: string };
 export type Result = 0 | 1;
-export type TournamentState = { teams: Team[]; draw: Record<string, number>; results: Record<string, Result> };
+export type TournamentInfo = { tournamentType: string; date: string; referee: string };
+export type TournamentState = { teams: Team[]; draw: Record<string, number>; results: Record<string, Result>; info?: TournamentInfo };
 export type Source = { slot: string; band?: string } | { match: number; outcome: 'winner' | 'loser' };
 export type Match = { id: number; round: string; cell: string; entries: [Source, Source]; places?: [number, number] };
 const slot = (name: string, band?: string): Source => band ? { slot: name, band } : { slot: name };
@@ -44,7 +45,7 @@ export const matches: Match[] = [
   { id: 27, round: '3e / 4e place', cell: 'Q35', entries: [lose(23), lose(24)], places: [3, 4] },
   { id: 28, round: 'Finale', cell: 'Q16', entries: [win(23), win(24)], places: [1, 2] },
 ];
-export function initialState(): TournamentState { return { teams: importedTeams, draw: { L4: 2, L30: 1 }, results: {} }; }
+export function initialState(): TournamentState { return { teams: importedTeams, draw: { L4: 2, L30: 1 }, results: {}, info: { tournamentType: '', date: '', referee: '' } }; }
 export function isTeamComplete(team: Team): boolean {
   return Boolean(team.player1.trim() && team.player2.trim()) && [team.ranking1, team.ranking2].every(value => Number.isInteger(Number(value)) && Number(value) > 0);
 }

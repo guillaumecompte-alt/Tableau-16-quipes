@@ -17,5 +17,21 @@ describe('Tournament backup restoration', () => {
     expect(restored.state.teams).toHaveLength(16);
     expect(restored.state.draw).toEqual(state.draw);
     expect(restored.state.results).toEqual({});
+    expect(restored.state.info).toEqual({ tournamentType: '', date: '', referee: '' });
+  });
+
+  it('persists tournament information in a backup', () => {
+    const state = initialState();
+    state.info = { tournamentType: 'P50', date: '2026-11-14', referee: 'Camille Martin' };
+    const restored = parseTournamentBackup(serializeTournamentBackup(state));
+    expect(restored.state.info).toEqual(state.info);
+  });
+
+  it('accepts an older backup without tournament information', () => {
+    const state = initialState();
+    const legacy = { ...state } as Partial<typeof state>;
+    delete legacy.info;
+    const restored = parseTournamentBackup(serializeTournamentBackup(legacy as typeof state));
+    expect(restored.state.info).toBeUndefined();
   });
 });

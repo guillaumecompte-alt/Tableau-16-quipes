@@ -1032,3 +1032,80 @@ input:focus-visible {
 .video-canvas { display: block; width: 100%; max-height: 55vh; aspect-ratio: 9 / 16; object-fit: contain; border-radius: 0.75rem; margin-top: 0.75rem; }
 .video-draw-action { white-space: nowrap; }
 @media (max-width: 760px) { .video-draw-action { font-size: 0.75rem; padding-inline: 0.55rem; } }
+
+
+/* Informations du tournoi */
+.tournament-info-panel {
+  margin: 4px 0 34px;
+  padding: clamp(20px, 3vw, 34px);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(9, 37, 74, .04);
+}
+.tournament-info-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  margin-bottom: 26px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.tournament-info-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  color: #1265b5;
+  background: #eaf3fd;
+}
+.tournament-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 22px;
+}
+.tournament-info-field {
+  margin-top: 0;
+  margin-bottom: 18px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.tournament-info-field input {
+  box-sizing: border-box;
+  height: 44px;
+  border: 1px solid var(--input);
+  border-radius: 7px;
+  padding: 11px 13px;
+  margin-top: 8px;
+  background: var(--background);
+  font-size: 14px;
+  font-weight: 400;
+}
+.tournament-info-field input::placeholder {
+  color: #8a9db5;
+  opacity: 1;
+}
+.tournament-info-field input:focus {
+  outline: 2px solid rgba(18, 101, 181, .18);
+  border-color: #4d8fce;
+}
+.tournament-info-field-wide { grid-column: 1 / -1; }
+.tournament-info-footnote {
+  margin-top: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.7;
+}
+@media (max-width: 620px) {
+  .app-sidebar nav { overflow-x: auto; padding-bottom: 5px; }
+  .nav-item { flex: 0 0 auto; }
+  .tournament-info-panel { padding: 19px 16px; }
+  .tournament-info-grid { grid-template-columns: minmax(0, 1fr); }
+  .tournament-info-field-wide { grid-column: auto; }
+}
