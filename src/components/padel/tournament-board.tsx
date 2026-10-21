@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
-import { Shuffle, GitBranch, Trophy, CheckCheck, Users, X, RotateCcw, Sparkles, Check } from 'lucide-react';
+import { Shuffle, GitBranch, Trophy, CheckCheck, Users, X, RotateCcw, Sparkles, Check, Clapperboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { bands, canDraw, isTeamComplete, drawAll, drawBand, initialState, matches, type TournamentState, type Team } from '@/lib/padel/tournament';
 import { useTournament } from './use-tournament';
 import { MatchCard } from './match-card';
+import { DrawVideoDialog } from './draw-video-dialog';
+import { isDrawComplete } from '@/lib/padel/draw-video';
 
 type RoundGroup = { title: string; ids: number[]; detail?: string };
 const mainGroups: RoundGroup[] = [{ title: '1er tour', ids: [1, 2, 3, 4], detail: 'Rangs 9 à 16' }, { title: '2e tour', ids: [5, 6, 7, 8], detail: 'Entrée des rangs 5 à 8' }, { title: 'Quarts de finale', ids: [13, 14, 15, 16], detail: 'Entrée des têtes de série' }, { title: 'Demi-finales', ids: [23, 24], detail: 'Dernier carré' }, { title: 'Finale', ids: [28], detail: 'Le titre en jeu' }];
@@ -115,6 +117,7 @@ export function TournamentBoard() {
   const { state, update, busy } = useTournament();
   const [tab, setTab] = useState('main');
   const [drawOpen, setDrawOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
   const [confirm, setConfirm] = useState<PendingConfirmation | null>(null);
   const [wheelRun, setWheelRun] = useState<WheelRun | null>(null);
   const drawingRef = useRef(false);
@@ -192,11 +195,12 @@ export function TournamentBoard() {
   }
 
   return <><section className="stats-strip"><div><Users /><span><strong>{registered}<em>/16</em></strong> équipes inscrites</span></div><div><GitBranch /><span><strong>28</strong> matchs au total</span></div><div><CheckCheck /><span><strong>{complete}<em>/28</em></strong> matchs terminés</span></div><div><Trophy /><span><strong>16</strong> places attribuées</span></div></section>
-    <section className="board-section"><div className="section-heading"><div><span className="section-eyebrow">LA COMPÉTITION</span><h2>Tableau du tournoi</h2></div><div className="flex items-center gap-2"><Button variant="outline" size="icon" title="Réinitialiser le tirage et les résultats" aria-label="Réinitialiser le tournoi" disabled={busy || !!wheelRun} onClick={requestReset}><RotateCcw /></Button><Button disabled={busy || !ready || !!wheelRun} onClick={() => setDrawOpen(true)}><Shuffle />{drawn ? 'Gérer le tirage' : 'Lancer le tirage'}</Button></div></div>
+    <section className="board-section"><div className="section-heading"><div><span className="section-eyebrow">LA COMPÉTITION</span><h2>Tableau du tournoi</h2></div><div className="flex items-center gap-2"><Button variant="outline" size="icon" title="Réinitialiser le tirage et les résultats" aria-label="Réinitialiser le tournoi" disabled={busy || !!wheelRun} onClick={requestReset}><RotateCcw /></Button><Button variant="outline" className="video-draw-action" disabled={!isDrawComplete(state) || busy || !!wheelRun} title={isDrawComplete(state) ? "Générer une vidéo du tirage complet" : "Effectuez le tirage complet avant de générer la vidéo"} onClick={() => setVideoOpen(true)}><Clapperboard />Générer la vidéo du tirage</Button><Button disabled={busy || !ready || !!wheelRun} onClick={() => setDrawOpen(true)}><Shuffle />{drawn ? 'Gérer le tirage' : 'Lancer le tirage'}</Button></div></div>
       {!ready && <p role="status" className="text-sm text-muted-foreground mb-4">Complétez les {16 - registered} paires manquantes dans Équipes avant le tirage.</p>}<div className="board-tabs"><Button variant="ghost" className={tab === 'main' ? 'tab-active' : ''} onClick={() => setTab('main')}><GitBranch />Tableau principal<span>15</span></Button><Button variant="ghost" className={tab === 'placement' ? 'tab-active' : ''} onClick={() => setTab('placement')}><Trophy />Matchs de classement<span>13</span></Button><span className="board-legend"><span className="legend-square" />Tête de série</span></div>
       <div className="bracket-scroll"><div className={`bracket ${tab === 'placement' ? 'placement-bracket' : ''}`}>{(tab === 'main' ? mainGroups : placementGroups).map((group, index) => <section key={group.title} className={`bracket-column bracket-column-${index}`}><header className="round-heading"><span className="round-number">{String(index + 1).padStart(2, '0')}</span><div><h3>{group.title}</h3><small>{'detail' in group ? group.detail : `${group.ids.length} matchs`}</small></div></header><div className="round-matches">{group.ids.map(id => { const match = matches.find(m => m.id === id); return match ? <MatchCard key={id} match={match} /> : null; })}</div></section>)}</div></div>
       <div className="board-bottom"><span><span className="live-dot" />{drawn ? 'Tirage effectué · 16 équipes placées' : 'Têtes de série placées · Tirage en attente'}</span><span>Format D2 · 1 set de 9 jeux · No Ad</span></div>
     </section>
+    {videoOpen && <DrawVideoDialog state={state} onClose={() => setVideoOpen(false)} />}
     {drawOpen && <div className="modal-backdrop" onClick={() => setDrawOpen(false)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="draw-title" onClick={e => e.stopPropagation()}><Button size="icon" variant="ghost" className="modal-close" aria-label="Fermer" onClick={() => setDrawOpen(false)}><X /></Button><span className="modal-eyebrow">ENTRÉE ÉCHELONNÉE</span><h2 id="draw-title">Tirage au sort</h2><div className="draw-seeds"><Trophy size={18} /><span>TS1 et TS2 sont déjà placées.</span></div><div className="draw-groups">{Object.entries(bands).map(([band, group]) => <div key={band}><div><strong>Rangs {band}</strong><small>{group.ranks.length} équipes · {group.slots.every(s => state.draw[s]) ? 'Tiré' : 'À tirer'}</small></div><Button variant="outline" size="sm" disabled={busy || !ready || !!wheelRun} onClick={() => requestWheelDraw([band])}><Shuffle />{group.slots.every(s => state.draw[s]) ? 'Retirer' : 'Tirer'}</Button></div>)}</div><Button className="w-full mt-5" disabled={busy || !ready || !!wheelRun} onClick={() => requestWheelDraw(Object.keys(bands))}><Shuffle />Tirer tous les groupes</Button></section></div>}
     {wheelRun && <div className="modal-backdrop draw-wheel-backdrop"><section className="modal draw-wheel-modal" role="dialog" aria-modal="true" aria-labelledby="wheel-title">
       <div className="wheel-modal-topline"><span className="modal-eyebrow">ZE PADEL · TIRAGE OFFICIEL</span><span className="wheel-counter">ÉTAPE {Math.min(wheelRun.revealed.length + (wheelRun.spinning ? 1 : 0), wheelRun.bandKeys.reduce((sum, band) => sum + (bands[band]?.slots.length ?? 0), 0))} / {wheelRun.bandKeys.reduce((sum, band) => sum + (bands[band]?.slots.length ?? 0), 0)}</span></div>

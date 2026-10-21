@@ -1025,3 +1025,10 @@ input:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+
+/* Export vidéo Instagram Reels */
+.video-modal { max-width: 26rem; max-height: 95vh; overflow-y: auto; }
+.video-canvas { display: block; width: 100%; max-height: 55vh; aspect-ratio: 9 / 16; object-fit: contain; border-radius: 0.75rem; margin-top: 0.75rem; }
+.video-draw-action { white-space: nowrap; }
+@media (max-width: 760px) { .video-draw-action { font-size: 0.75rem; padding-inline: 0.55rem; } }
