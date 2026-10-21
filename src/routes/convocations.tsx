@@ -35,6 +35,7 @@ function ConvocationsPage() {
   const [realMessage, setRealMessage] = useState('');
   const [realError, setRealError] = useState(false);
 
+  // Simulation campaigns are sent in bounded batches to respect Worker subrequest limits.
   async function sendSimulationCampaign() {
     const tournamentType = state.info?.tournamentType.trim() ?? '';
     const date = state.info?.date.trim() ?? '';
