@@ -54,3 +54,8 @@ Le relais reste en mode test après installation. La propriété `ZE_PADEL_MODE`
 Le relais a une limite indépendante de **40 destinataires réels par jour**, en plus du quota Gmail, et rejette les doublons de campagne. Après un envoi partiel, inspecte le résultat et les boîtes de réception avant toute nouvelle tentative.
 
 **Ne partage pas** `ZE_PADEL_API_SECRET` dans GitHub, le navigateur, les messages ou les captures d'écran.
+
+
+## Simulation de campagne (32 e-mails)
+
+La page Convocations peut envoyer une simulation de 32 messages : les messages du joueur 1 de chaque paire vont à `guillaume.compte@gmail.com`, ceux du joueur 2 vont à `williamdurand84@gmail.com`. Tous les sujets et corps comportent une mention explicite « SIMULATION » ; les adresses de joueurs présentes dans le tournoi sont ignorées. Le relais doit être redéployé avec `MAX_TEST_RECIPIENTS_PER_DAY = 40` pour permettre cette campagne après les tests individuels. Le mode global reste `TEST_ONLY` ; ne crée pas `ZE_PADEL_MODE=PRODUCTION` avant vérification et autorisation explicite.
