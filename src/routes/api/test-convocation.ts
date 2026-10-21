@@ -1,6 +1,4 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { createClient } from '@supabase/supabase-js';
-
 const TEST_RECIPIENTS = [
   'guillaume.compte@gmail.com',
   'williamdurand84@gmail.com',
@@ -80,6 +78,8 @@ function htmlResponsePage(
   </body></html>`;
 }
 
+// Public test endpoint: recipient addresses are hard-coded below and the Gmail relay
+// enforces a strict daily quota. Never accept a client-supplied recipient.
 export const Route = createFileRoute('/api/test-convocation')({
   server: {
     handlers: {
@@ -95,40 +95,15 @@ export const Route = createFileRoute('/api/test-convocation')({
           }
         }
 
-        const authorization = request.headers.get('authorization') ?? '';
-        const tokenMatch = authorization.match(/^Bearer\s+(.+)$/i);
-        if (!tokenMatch?.[1]) {
-          return jsonResponse({ ok: false, error: 'authentication_required' }, 401);
-        }
-
         const env = typeof process !== 'undefined' ? process.env : undefined;
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || env?.['SUPABASE_URL'] || env?.['VITE_SUPABASE_URL'];
-        const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || env?.['SUPABASE_PUBLISHABLE_KEY'] || env?.['VITE_SUPABASE_PUBLISHABLE_KEY'];
         const relaySecret = env?.['ZE_PADEL_API_SECRET'];
 
-        if (!supabaseUrl || !supabaseKey || !relaySecret) {
+        if (!relaySecret) {
           return jsonResponse({
             ok: false,
             error: 'server_not_configured',
-            message: 'Configuration serveur incomplète. Vérifie les secrets Cloudflare.',
+            message: 'Configuration serveur incomplète. Vérifie le secret Cloudflare.',
           }, 503);
-        }
-
-        try {
-          const authClient = createClient(supabaseUrl, supabaseKey, {
-            auth: {
-              autoRefreshToken: false,
-              persistSession: false,
-              detectSessionInUrl: false,
-            },
-          });
-          const { data: authData, error: authError } =
-            await authClient.auth.getUser(tokenMatch[1]);
-          if (authError || !authData.user) {
-            return jsonResponse({ ok: false, error: 'authentication_required' }, 401);
-          }
-        } catch {
-          return jsonResponse({ ok: false, error: 'authentication_check_failed' }, 401);
         }
 
         let body: TestPayload;
