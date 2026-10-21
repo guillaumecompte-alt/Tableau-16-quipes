@@ -5,6 +5,7 @@
 const TEST_RECIPIENTS = new Set([
   'guillaume.compte@gmail.com',
   'williamdurand84@gmail.com',
+  'guigui99999@hotmail.com',
 ]);
 const SECRET_PROPERTY = 'ZE_PADEL_API_SECRET';
 const MODE_PROPERTY = 'ZE_PADEL_MODE';
