@@ -792,3 +792,98 @@ input:focus-visible {
   .backup-action-label, .save-button-label { display: none; }
   .backup-feedback { margin: 10px 16px 0; }
 }
+
+
+/* Tirage au sort : fenêtre large, roue à gauche et résultats complets à droite. */
+.draw-wheel-backdrop {
+  padding: 12px;
+  overflow: auto;
+  align-items: center;
+}
+.draw-wheel-modal {
+  width: min(1440px, 98vw);
+  max-width: 98vw;
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  padding: clamp(16px, 2vw, 28px);
+}
+.wheel-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.35fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 16px 24px;
+}
+.wheel-stage {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  width: min(100%, calc(100dvh - 240px));
+  max-width: 540px;
+  justify-self: center;
+  align-self: center;
+}
+.wheel-result-panel {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+}
+.wheel-revealed-list {
+  grid-column: 2;
+  grid-row: 2;
+  min-width: 0;
+  margin-top: 0;
+}
+.wheel-revealed-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-height: none;
+  overflow: visible;
+  gap: 7px;
+}
+.wheel-revealed-item {
+  min-width: 0;
+  padding: 8px 9px;
+  gap: 7px;
+}
+.wheel-revealed-names strong {
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+.wheel-revealed-names small {
+  font-size: 0.68rem;
+}
+.wheel-finished-actions {
+  position: sticky;
+  bottom: -1px;
+  padding-top: 12px;
+  background: inherit;
+}
+@media (max-width: 900px) {
+  .draw-wheel-modal {
+    width: min(720px, 96vw);
+    max-height: calc(100dvh - 16px);
+    padding: 16px;
+  }
+  .wheel-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    gap: 14px;
+  }
+  .wheel-stage,
+  .wheel-result-panel,
+  .wheel-revealed-list {
+    grid-column: 1;
+    grid-row: auto;
+  }
+  .wheel-stage {
+    width: min(76vw, 360px);
+    max-width: 100%;
+  }
+  .wheel-revealed-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 540px) {
+  .wheel-revealed-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
