@@ -357,7 +357,12 @@ function scheduleSounds(ac: AudioContext, out: AudioNode, sequence: Reveal[]) {
     tone(at + interval * 0.5, 660, 0.25, 'triangle', 0.22);
     tone(at + interval * 0.53, 990, 0.3, 'triangle', 0.17);
   });
-  [523, 659, 784, 1047].forEach((frequency, index) => tone(REVEAL_END + 0.1 + index * 0.12, frequency, 0.55, 'triangle', 0.18));
+  // Play the short final fanfare before the reveal phase ends.
+  // Every oscillator is stopped before the final static-board screen begins.
+  const fanfareStart = Math.max(0, REVEAL_END - 0.65);
+  [523, 659, 784, 1047].forEach((frequency, index) =>
+    tone(fanfareStart + index * 0.08, frequency, 0.14, 'triangle', 0.16)
+  );
 }
 
 export function DrawVideoDialog({ state, onClose }: { state: TournamentState; onClose: () => void }) {
