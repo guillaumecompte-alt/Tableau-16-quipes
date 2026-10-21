@@ -30,6 +30,7 @@ function ConvocationsPage() {
   const [sendingSimulation, setSendingSimulation] = useState(false);
   const [simulationMessage, setSimulationMessage] = useState('');
   const [simulationError, setSimulationError] = useState(false);
+  const [simulationRunId, setSimulationRunId] = useState<string | null>(null);
   const [showRealPreview, setShowRealPreview] = useState(false);
   const [sendingReal, setSendingReal] = useState(false);
   const [realMessage, setRealMessage] = useState('');
@@ -76,8 +77,15 @@ function ConvocationsPage() {
     setSimulationError(false);
     setSimulationMessage('Envoi de la simulation en cours… Ne ferme pas cette page.');
 
+    // Reuse the same run ID after a partial failure so accepted messages are deduplicated.
+    // A completed campaign clears it; the next explicit test then gets a fresh run ID
+    // and can resend all 32 messages, even if old test emails were deleted from Gmail.
+    const runId = simulationRunId ?? crypto.randomUUID();
+    setSimulationRunId(runId);
+
     try {
       const payload = {
+        runId,
         teams: teams.map((team) => ({
           rank: team.rank,
           player1: team.player1,
@@ -144,6 +152,7 @@ function ConvocationsPage() {
           `Simulation terminée : ${sentCount} nouveaux e-mails acceptés, ${duplicateCount} déjà traités. Vérifie les deux boîtes de réception et les courriers indésirables.`
         );
         setSimulationError(false);
+        setSimulationRunId(null);
       }
     } catch (error) {
       setSimulationMessage(error instanceof Error ? error.message : 'Impossible de terminer la simulation.');
