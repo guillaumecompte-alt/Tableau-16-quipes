@@ -1,6 +1,6 @@
 import { Link, useLocation } from '@tanstack/react-router';
 import { useRef, useState, type ReactNode } from 'react';
-import { GitBranch, Users, Trophy, CircleDot, Shuffle, LogOut, Save, X, CalendarDays, MapPin, ArrowUpRight, Download, Upload } from 'lucide-react';
+import { GitBranch, Users, Trophy, CalendarClock, CircleDot, Shuffle, LogOut, Save, X, CalendarDays, MapPin, ArrowUpRight, Download, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { lovable } from '@/integrations/lovable';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +14,7 @@ export function TournamentShell({ children }: { children: ReactNode }) {
   const [backupFeedback, setBackupFeedback] = useState('');
   const backupInput = useRef<HTMLInputElement>(null);
   const path = useLocation().pathname;
-  const nav = [{ to: '/' as const, title: 'Tableau du tournoi', icon: GitBranch }, { to: '/equipes' as const, title: 'Équipes', icon: Users }, { to: '/classement' as const, title: 'Classement', icon: Trophy }];
+  const nav = [{ to: '/' as const, title: 'Tableau du tournoi', icon: GitBranch }, { to: '/equipes' as const, title: 'Équipes', icon: Users }, { to: '/convocations' as const, title: 'Convocations', icon: CalendarClock }, { to: '/classement' as const, title: 'Classement', icon: Trophy }];
   async function signIn(provider: 'google' | 'lovable') { const result = await lovable.auth.signInWithOAuth(provider, { redirect_uri: window.location.origin }); if (result.error) setAuthError('Connexion impossible. Veuillez réessayer.'); else setLogin(false); }
   return <div className="app-layout">
     <aside className="app-sidebar">
