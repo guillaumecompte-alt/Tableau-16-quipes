@@ -9,7 +9,7 @@ const TEST_RECIPIENTS = new Set([
 ]);
 const SECRET_PROPERTY = 'ZE_PADEL_API_SECRET';
 const MODE_PROPERTY = 'ZE_PADEL_MODE';
-const MAX_TEST_RECIPIENTS_PER_DAY = 40;
+const MAX_TEST_RECIPIENTS_PER_DAY = 80;
 const MAX_PRODUCTION_RECIPIENTS_PER_DAY = 40;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
