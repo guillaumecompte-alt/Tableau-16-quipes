@@ -14,6 +14,7 @@ type Team = {
   time?: unknown;
 };
 type Payload = {
+  batch?: unknown;
   teams?: Team[];
   tournament?: {
     tournamentType?: unknown;
@@ -94,28 +95,6 @@ async function getCampaignId(value: string): Promise<string> {
     .join('');
 }
 
-/** Retry transient network failures with the same request ID. The Apps Script relay
- * deduplicates accepted requests, so a lost response cannot cause a second email.
- */
-async function fetchRelayWithRetry(
-  url: string,
-  init: RequestInit,
-  maxAttempts = 3,
-): Promise<Response> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    try {
-      return await fetch(url, init);
-    } catch (error) {
-      lastError = error;
-      if (attempt + 1 < maxAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, 700 * (attempt + 1)));
-      }
-    }
-  }
-  throw lastError instanceof Error ? lastError : new Error('Relais Gmail inaccessible');
-}
-
 export const Route = createFileRoute('/api/simulate-convocations')({
   server: {
     handlers: {
@@ -153,7 +132,11 @@ export const Route = createFileRoute('/api/simulate-convocations')({
         const date = cleanText(payload.tournament?.date, 80);
         const referee = cleanText(payload.tournament?.referee, 120);
         const teams = payload.teams;
+        const batch = Number(payload.batch);
 
+        if (batch !== 1 && batch !== 2) {
+          return response({ ok: false, error: 'invalid_batch', message: 'Le lot doit être 1 ou 2.' }, 400);
+        }
         if (!tournament || !date || !Array.isArray(teams) || teams.length !== 16) {
           return response({
             ok: false,
@@ -218,11 +201,13 @@ export const Route = createFileRoute('/api/simulate-convocations')({
           })),
         });
         const campaignId = await getCampaignId(campaignFingerprint);
+        // Send 16 messages per incoming Worker request to stay below redirect subrequest limits.
+        const batchMessages = messages.filter((item) => batch === 1 ? item.rank <= 8 : item.rank >= 9);
         let sentCount = 0;
         let duplicateCount = 0;
         const errors: string[] = [];
 
-        for (const item of messages) {
+        for (const item of batchMessages) {
           const requestId = `sim_${campaignId}_${item.rank}_${item.slot}`;
           const subject = `[SIMULATION ZE PADEL] Convocation — paire #${item.rank}`;
           const text = [
@@ -286,7 +271,7 @@ export const Route = createFileRoute('/api/simulate-convocations')({
             sentCount,
             duplicateCount,
             failureCount: errors.length,
-            message: 'La simulation est partielle. N’appuie pas à nouveau immédiatement : vérifie les messages reçus avant une nouvelle tentative.',
+            message: `Le lot ${batch}/2 est partiel.`,
             issues: errors.slice(0, 10),
           }, 502);
         }
@@ -295,11 +280,12 @@ export const Route = createFileRoute('/api/simulate-convocations')({
           ok: true,
           sentCount,
           duplicateCount,
-          toGuillaume: messages.filter((message) => message.testTo === TEST_RECIPIENTS[0]).length,
-          toWilliam: messages.filter((message) => message.testTo === TEST_RECIPIENTS[1]).length,
+          batch,
+          toGuillaume: batchMessages.filter((message) => message.testTo === TEST_RECIPIENTS[0]).length,
+          toWilliam: batchMessages.filter((message) => message.testTo === TEST_RECIPIENTS[1]).length,
           message: sentCount === 0
-            ? `Ces 32 messages de simulation ont déjà été traités. Aucun doublon n’a été envoyé.`
-            : `Simulation terminée : ${sentCount} e-mails envoyés (${messages.filter((message) => message.testTo === TEST_RECIPIENTS[0]).length} à la première boîte de test et ${messages.filter((message) => message.testTo === TEST_RECIPIENTS[1]).length} à la seconde).`,
+            ? `Lot ${batch}/2 traité : tous les messages étaient déjà enregistrés.`
+            : `Lot ${batch}/2 terminé : ${sentCount} e-mails envoyés.`,
         });
       },
     },
