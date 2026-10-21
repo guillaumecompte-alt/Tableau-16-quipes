@@ -1,8 +1,6 @@
 /**
  * ZE PADEL — Gmail relay.
- *
- * Default mode is TEST_ONLY. Production must be explicitly enabled via the
- * ZE_PADEL_MODE script property. Never place the shared secret in source code.
+ * Default mode is TEST_ONLY. Production requires an explicit script property.
  */
 const TEST_RECIPIENTS = new Set([
   'guillaume.compte@gmail.com',
