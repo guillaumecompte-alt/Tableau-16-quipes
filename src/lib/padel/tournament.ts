@@ -1,6 +1,6 @@
 import importedTeams from './teams.json';
 
-export type Team = { rank: number; player1: string; player2: string; ranking1: number | string; ranking2: number | string; time: string };
+export type Team = { rank: number; player1: string; player2: string; ranking1: number | string; ranking2: number | string; email1?: string; email2?: string; time: string };
 export type Result = 0 | 1;
 export type TournamentState = { teams: Team[]; draw: Record<string, number>; results: Record<string, Result> };
 export type Source = { slot: string; band?: string } | { match: number; outcome: 'winner' | 'loser' };
