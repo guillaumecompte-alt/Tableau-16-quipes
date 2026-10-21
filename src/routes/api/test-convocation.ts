@@ -102,8 +102,8 @@ export const Route = createFileRoute('/api/test-convocation')({
         }
 
         const env = typeof process !== 'undefined' ? process.env : undefined;
-        const supabaseUrl = env?.['SUPABASE_URL'];
-        const supabaseKey = env?.['SUPABASE_PUBLISHABLE_KEY'];
+        const supabaseUrl = env?.['SUPABASE_URL'] ?? env?.['VITE_SUPABASE_URL'];
+        const supabaseKey = env?.['SUPABASE_PUBLISHABLE_KEY'] ?? env?.['VITE_SUPABASE_PUBLISHABLE_KEY'];
         const relaySecret = env?.['ZE_PADEL_API_SECRET'];
 
         if (!supabaseUrl || !supabaseKey || !relaySecret) {
