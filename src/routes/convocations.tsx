@@ -93,44 +93,55 @@ function ConvocationsPage() {
 
       let sentCount = 0;
       let duplicateCount = 0;
-      const batchErrors: string[] = [];
+      const sendErrors: string[] = [];
 
-      const sendBatch = async (batch: 1 | 2) => {
+      // One email per Worker request avoids redirect subrequest-limit failures.
+      // The backend derives a deterministic idempotency key from this campaign.
+      for (let messageIndex = 0; messageIndex < 32; messageIndex += 1) {
+        setSimulationMessage(
+          `Simulation en cours : message ${messageIndex + 1}/32. ${sentCount} nouveaux e-mails acceptés, ${duplicateCount} déjà traités…`
+        );
         try {
           const response = await fetch('/api/simulate-convocations', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ ...payload, batch }),
+            body: JSON.stringify({ ...payload, messageIndex }),
           });
-          const result = await response.json() as {
+          let result: {
             ok?: boolean;
             sentCount?: number;
             duplicateCount?: number;
             message?: string;
             issues?: string[];
-          };
+          } = {};
+          try {
+            result = await response.json() as typeof result;
+          } catch {
+            sendErrors.push(`Message ${messageIndex + 1}/32 : réponse serveur inattendue.`);
+            continue;
+          }
+
           sentCount += result.sentCount ?? 0;
           duplicateCount += result.duplicateCount ?? 0;
           if (!response.ok || !result.ok) {
-            batchErrors.push(`Lot ${batch}/2 : ${result.message || 'échec'}`);
-            batchErrors.push(...(result.issues ?? []));
+            sendErrors.push(result.message || `Échec du message ${messageIndex + 1}/32.`);
+            sendErrors.push(...(result.issues ?? []));
           }
         } catch (error) {
-          batchErrors.push(`Lot ${batch}/2 : ${error instanceof Error ? error.message : 'erreur réseau'}`);
+          sendErrors.push(
+            `Message ${messageIndex + 1}/32 : ${error instanceof Error ? error.message : 'erreur réseau'}`
+          );
         }
-      };
+      }
 
-      await sendBatch(1);
-      await sendBatch(2);
-
-      if (batchErrors.length > 0) {
+      if (sendErrors.length > 0) {
         setSimulationMessage(
-          `Simulation partielle : ${sentCount} nouveaux e-mails acceptés, ${duplicateCount} déjà traités.\\n${batchErrors.join('\\n')}`
+          `Simulation partielle : ${sentCount} nouveaux e-mails acceptés, ${duplicateCount} déjà traités.\\n${sendErrors.join('\\n')}`
         );
         setSimulationError(true);
       } else {
         setSimulationMessage(
-          `Simulation terminée en 2 lots : ${sentCount} nouveaux e-mails acceptés, ${duplicateCount} déjà traités. Vérifie les deux boîtes de réception et les courriers indésirables.`
+          `Simulation terminée : ${sentCount} nouveaux e-mails acceptés, ${duplicateCount} déjà traités. Vérifie les deux boîtes de réception et les courriers indésirables.`
         );
         setSimulationError(false);
       }
