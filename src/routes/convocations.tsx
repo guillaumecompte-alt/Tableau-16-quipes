@@ -3,7 +3,6 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useTournament } from '@/components/padel/use-tournament';
 import { TournamentShell } from '@/components/padel/tournament-shell';
 import { isTeamComplete } from '@/lib/padel/tournament';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 
 export const Route = createFileRoute('/convocations')({
@@ -20,12 +19,6 @@ function ConvocationsPage() {
   const [testError, setTestError] = useState(false);
 
   async function sendTestConvocation() {
-    if (!user) {
-      setTestError(true);
-      setTestMessage('Connecte-toi pour effectuer le test d’envoi.');
-      return;
-    }
-
     const team = state.teams.find((entry) => entry.rank === 1);
     if (!team || !team.player1.trim() || !team.player2.trim()) {
       setTestError(true);
@@ -38,17 +31,10 @@ function ConvocationsPage() {
     setTestMessage('Envoi des deux e-mails de test en cours…');
 
     try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-      if (sessionError || !accessToken) {
-        throw new Error('Ta session a expiré. Reconnecte-toi puis réessaie.');
-      }
-
       const response = await fetch('/api/test-convocation', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           team: {
@@ -100,8 +86,8 @@ function ConvocationsPage() {
 
       <div className="mb-6 rounded-lg border p-4">
         <h3 className="font-semibold">Tester l’envoi Gmail</h3>
-        <p className="text-sm text-muted-foreground mt-2 mb-3">En mode test, un seul clic envoie un e-mail marqué « TEST » aux deux adresses de test autorisées. Les adresses des joueurs du tournoi ne sont pas utilisées. Le message reprend les informations de la paire de rang 1.</p>
-        <Button type="button" onClick={() => void sendTestConvocation()} disabled={!user || busy || sendingTest}>
+        <p className="text-sm text-muted-foreground mt-2 mb-3">En mode test, un clic envoie un e-mail marqué « TEST » aux deux adresses de test autorisées, même si le tournoi est en mode local. Les adresses des joueurs du tournoi ne sont pas utilisées. Le message reprend les informations de la paire de rang 1.</p>
+        <Button type="button" onClick={() => void sendTestConvocation()} disabled={busy || sendingTest}>
           {sendingTest ? 'Envoi en cours…' : 'Envoyer les 2 e-mails de test'}
         </Button>
         {testMessage && <p className={`text-sm mt-3 ${testError ? 'text-destructive' : 'text-muted-foreground'}`} role="status">{testMessage}</p>}
