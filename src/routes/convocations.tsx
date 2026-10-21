@@ -24,10 +24,105 @@ function ConvocationsPage() {
   const [sendingTest, setSendingTest] = useState(false);
   const [testMessage, setTestMessage] = useState('');
   const [testError, setTestError] = useState(false);
+  const [sendingSimulation, setSendingSimulation] = useState(false);
+  const [simulationMessage, setSimulationMessage] = useState('');
+  const [simulationError, setSimulationError] = useState(false);
   const [showRealPreview, setShowRealPreview] = useState(false);
   const [sendingReal, setSendingReal] = useState(false);
   const [realMessage, setRealMessage] = useState('');
   const [realError, setRealError] = useState(false);
+
+  async function sendSimulationCampaign() {
+    const tournamentType = state.info?.tournamentType.trim() ?? '';
+    const date = state.info?.date.trim() ?? '';
+    const teams = [...state.teams].sort((a, b) => a.rank - b.rank);
+    const issues: string[] = [];
+
+    if (!tournamentType) issues.push('Le type du tournoi doit être renseigné.');
+    if (!date) issues.push('La date du tournoi doit être renseignée.');
+    if (teams.length !== 16) issues.push('Il faut exactement 16 équipes.');
+
+    const ranks = new Set<number>();
+    for (const team of teams) {
+      if (!Number.isInteger(team.rank) || team.rank < 1 || team.rank > 16 || ranks.has(team.rank)) {
+        issues.push('Les rangs doivent être uniques de 1 à 16.');
+      }
+      ranks.add(team.rank);
+      if (!team.player1.trim() || !team.player2.trim()) {
+        issues.push(`Paire #${team.rank} : il manque un nom de joueur.`);
+      }
+      if (!team.time.trim()) {
+        issues.push(`Paire #${team.rank} : l’heure de convocation n’est pas renseignée.`);
+      }
+    }
+
+    if (ranks.size !== 16) issues.push('Les 16 rangs doivent être présents.');
+    if (issues.length) {
+      setSimulationError(true);
+      setSimulationMessage(issues.join('\n'));
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'SIMULATION DE 32 E-MAILS\n\nCela enverra réellement 32 messages marqués SIMULATION : 16 à guillaume.compte@gmail.com (joueur 1 de chaque paire) et 16 à williamdurand84@gmail.com (joueur 2 de chaque paire).\n\nAucun e-mail ne sera envoyé aux adresses enregistrées dans les équipes. Continuer ?'
+    );
+    if (!confirmed) return;
+
+    setSendingSimulation(true);
+    setSimulationError(false);
+    setSimulationMessage('Envoi de la simulation en cours… Ne ferme pas cette page.');
+
+    try {
+      const response = await fetch('/api/simulate-convocations', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          teams: teams.map((team) => ({
+            rank: team.rank,
+            player1: team.player1,
+            player2: team.player2,
+            time: team.time,
+          })),
+          tournament: {
+            tournamentType,
+            date,
+            referee: state.info?.referee ?? '',
+          },
+        }),
+      });
+
+      let result: {
+        ok?: boolean;
+        error?: string;
+        sentCount?: number;
+        duplicateCount?: number;
+        failureCount?: number;
+        message?: string;
+        issues?: string[];
+      } = {};
+      try {
+        result = await response.json() as typeof result;
+      } catch {
+        throw new Error('Le serveur a retourné une réponse inattendue.');
+      }
+
+      if (!response.ok || !result.ok) {
+        const details = result.issues?.length ? '\n' + result.issues.join('\n') : '';
+        throw new Error((result.message || 'La simulation a échoué.') + details);
+      }
+
+      setSimulationMessage(
+        result.message ||
+        `Simulation traitée : ${result.sentCount ?? 0} nouveaux e-mails et ${result.duplicateCount ?? 0} messages déjà traités. Vérifie les deux boîtes de réception et les courriers indésirables.`
+      );
+      setSimulationError(false);
+    } catch (error) {
+      setSimulationMessage(error instanceof Error ? error.message : 'Impossible de terminer la simulation.');
+      setSimulationError(true);
+    } finally {
+      setSendingSimulation(false);
+    }
+  }
 
   function realEmailIssues(): string[] {
     const issues: string[] = [];
@@ -212,6 +307,15 @@ function ConvocationsPage() {
           {sendingTest ? 'Envoi en cours…' : 'Envoyer les 2 e-mails de test'}
         </Button>
         {testMessage && <p className={`text-sm mt-3 ${testError ? 'text-destructive' : 'text-muted-foreground'}`} role="status">{testMessage}</p>}
+      </div>
+
+      <div className="mb-6 rounded-lg border p-4">
+        <h3 className="font-semibold">Simulation complète de la campagne (32 e-mails)</h3>
+        <p className="text-sm text-muted-foreground mt-2 mb-3">Envoie 32 messages réels marqués « SIMULATION », uniquement aux deux boîtes de test : 16 à guillaume.compte@gmail.com pour les joueurs 1 et 16 à williamdurand84@gmail.com pour les joueurs 2. Les adresses e-mail enregistrées dans les équipes sont ignorées. Vérifie le type, la date, les noms et les heures avant de commencer.</p>
+        <Button type="button" variant="outline" onClick={() => void sendSimulationCampaign()} disabled={busy || sendingSimulation}>
+          {sendingSimulation ? 'Simulation en cours…' : 'Envoyer les 32 e-mails de simulation'}
+        </Button>
+        {simulationMessage && <p className={`text-sm whitespace-pre-line mt-3 ${simulationError ? 'text-destructive' : 'text-muted-foreground'}`} role="status">{simulationMessage}</p>}
       </div>
 
       <div className="mb-6 rounded-lg border p-4">
