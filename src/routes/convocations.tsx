@@ -77,49 +77,63 @@ function ConvocationsPage() {
     setSimulationMessage('Envoi de la simulation en cours… Ne ferme pas cette page.');
 
     try {
-      const response = await fetch('/api/simulate-convocations', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          teams: teams.map((team) => ({
-            rank: team.rank,
-            player1: team.player1,
-            player2: team.player2,
-            time: team.time,
-          })),
-          tournament: {
-            tournamentType,
-            date,
-            referee: state.info?.referee ?? '',
-          },
-        }),
-      });
+      const payload = {
+        teams: teams.map((team) => ({
+          rank: team.rank,
+          player1: team.player1,
+          player2: team.player2,
+          time: team.time,
+        })),
+        tournament: {
+          tournamentType,
+          date,
+          referee: state.info?.referee ?? '',
+        },
+      };
 
-      let result: {
-        ok?: boolean;
-        error?: string;
-        sentCount?: number;
-        duplicateCount?: number;
-        failureCount?: number;
-        message?: string;
-        issues?: string[];
-      } = {};
-      try {
-        result = await response.json() as typeof result;
-      } catch {
-        throw new Error('Le serveur a retourné une réponse inattendue.');
+      let sentCount = 0;
+      let duplicateCount = 0;
+      const batchErrors: string[] = [];
+
+      const sendBatch = async (batch: 1 | 2) => {
+        try {
+          const response = await fetch('/api/simulate-convocations', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ ...payload, batch }),
+          });
+          const result = await response.json() as {
+            ok?: boolean;
+            sentCount?: number;
+            duplicateCount?: number;
+            message?: string;
+            issues?: string[];
+          };
+          sentCount += result.sentCount ?? 0;
+          duplicateCount += result.duplicateCount ?? 0;
+          if (!response.ok || !result.ok) {
+            batchErrors.push(`Lot ${batch}/2 : ${result.message || 'échec'}`);
+            batchErrors.push(...(result.issues ?? []));
+          }
+        } catch (error) {
+          batchErrors.push(`Lot ${batch}/2 : ${error instanceof Error ? error.message : 'erreur réseau'}`);
+        }
+      };
+
+      await sendBatch(1);
+      await sendBatch(2);
+
+      if (batchErrors.length > 0) {
+        setSimulationMessage(
+          `Simulation partielle : ${sentCount} nouveaux e-mails acceptés, ${duplicateCount} déjà traités.\\n${batchErrors.join('\\n')}`
+        );
+        setSimulationError(true);
+      } else {
+        setSimulationMessage(
+          `Simulation terminée en 2 lots : ${sentCount} nouveaux e-mails acceptés, ${duplicateCount} déjà traités. Vérifie les deux boîtes de réception et les courriers indésirables.`
+        );
+        setSimulationError(false);
       }
-
-      if (!response.ok || !result.ok) {
-        const details = result.issues?.length ? '\n' + result.issues.join('\n') : '';
-        throw new Error((result.message || 'La simulation a échoué.') + details);
-      }
-
-      setSimulationMessage(
-        result.message ||
-        `Simulation traitée : ${result.sentCount ?? 0} nouveaux e-mails et ${result.duplicateCount ?? 0} messages déjà traités. Vérifie les deux boîtes de réception et les courriers indésirables.`
-      );
-      setSimulationError(false);
     } catch (error) {
       setSimulationMessage(error instanceof Error ? error.message : 'Impossible de terminer la simulation.');
       setSimulationError(true);
