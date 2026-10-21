@@ -1,22 +1,27 @@
 /**
- * ZE PADEL — Gmail relay for controlled test emails.
+ * ZE PADEL — Gmail relay.
  *
- * This script intentionally sends ONLY to the two test addresses below.
- * Do not widen the allowlist until the app and email content have been validated.
+ * Default mode is TEST_ONLY. Production must be explicitly enabled via the
+ * ZE_PADEL_MODE script property. Never place the shared secret in source code.
  */
-
 const TEST_RECIPIENTS = new Set([
   'guillaume.compte@gmail.com',
   'williamdurand84@gmail.com',
 ]);
 const SECRET_PROPERTY = 'ZE_PADEL_API_SECRET';
+const MODE_PROPERTY = 'ZE_PADEL_MODE';
 const MAX_TEST_RECIPIENTS_PER_DAY = 10;
+const MAX_PRODUCTION_RECIPIENTS_PER_DAY = 40;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function doGet() {
+  const mode = PropertiesService.getScriptProperties().getProperty(MODE_PROPERTY) === 'PRODUCTION'
+    ? 'PRODUCTION'
+    : 'TEST_ONLY';
   return jsonResponse_({
     ok: true,
     service: 'ZE PADEL Gmail relay',
-    mode: 'TEST_ONLY',
+    mode: mode,
   });
 }
 
@@ -50,8 +55,25 @@ function doPost(e) {
     }
 
     const recipient = String(payload.to || '').trim().toLowerCase();
-    if (!TEST_RECIPIENTS.has(recipient)) {
-      return jsonResponse_({ ok: false, error: 'recipient_not_allowed_in_test_mode' });
+    const requestedMode = String(payload.mode || 'TEST_ONLY');
+    if (!EMAIL_RE.test(recipient) || recipient.length > 254) {
+      return jsonResponse_({ ok: false, error: 'invalid_recipient' });
+    }
+
+    const configuredProduction = props.getProperty(MODE_PROPERTY) === 'PRODUCTION';
+    if (requestedMode === 'TEST_ONLY') {
+      if (!TEST_RECIPIENTS.has(recipient)) {
+        return jsonResponse_({ ok: false, error: 'recipient_not_allowed_in_test_mode' });
+      }
+    } else if (requestedMode === 'PRODUCTION') {
+      if (!configuredProduction) {
+        return jsonResponse_({ ok: false, error: 'production_mode_not_enabled' });
+      }
+      if (TEST_RECIPIENTS.has(recipient)) {
+        return jsonResponse_({ ok: false, error: 'test_recipient_blocked_in_production' });
+      }
+    } else {
+      return jsonResponse_({ ok: false, error: 'invalid_mode' });
     }
 
     const requestId = String(payload.requestId || '');
@@ -70,17 +92,22 @@ function doPost(e) {
       Utilities.DigestAlgorithm.SHA_256,
       requestId + ':' + recipient,
     );
-    const sentKey = 'ZE_PADEL_TEST_SENT_' +
+    const sentKey = 'ZE_PADEL_SENT_' +
       Utilities.base64EncodeWebSafe(digest).replace(/=+$/g, '');
     if (props.getProperty(sentKey)) {
       return jsonResponse_({ ok: false, error: 'duplicate_request' });
     }
 
     const dateKey = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd');
-    const countKey = 'ZE_PADEL_TEST_COUNT_' + dateKey;
+    const quotaMode = requestedMode === 'PRODUCTION' ? 'PRODUCTION' : 'TEST';
+    const countKey = 'ZE_PADEL_' + quotaMode + '_COUNT_' + dateKey;
     const count = Number(props.getProperty(countKey) || 0);
-    if (count >= MAX_TEST_RECIPIENTS_PER_DAY) {
-      return jsonResponse_({ ok: false, error: 'test_daily_limit_reached' });
+    const maxPerDay = requestedMode === 'PRODUCTION'
+      ? MAX_PRODUCTION_RECIPIENTS_PER_DAY
+      : MAX_TEST_RECIPIENTS_PER_DAY;
+
+    if (count >= maxPerDay) {
+      return jsonResponse_({ ok: false, error: 'daily_limit_reached' });
     }
     if (MailApp.getRemainingDailyQuota() < 1) {
       return jsonResponse_({ ok: false, error: 'gmail_daily_quota_reached' });
@@ -94,11 +121,10 @@ function doPost(e) {
       name: 'ZE PADEL · Convocations',
     });
 
-    // Record only after Gmail accepts the send request.
     props.setProperty(sentKey, new Date().toISOString());
     props.setProperty(countKey, String(count + 1));
 
-    return jsonResponse_({ ok: true, sent: true, to: recipient });
+    return jsonResponse_({ ok: true, sent: true, to: recipient, mode: requestedMode });
   } catch (error) {
     console.error('ZE PADEL Gmail relay error: ' + String(error));
     return jsonResponse_({ ok: false, error: 'send_failed' });
