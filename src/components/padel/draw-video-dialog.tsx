@@ -44,7 +44,7 @@ function fit(ctx: CanvasRenderingContext2D, text: string, max: number) {
 const clamp01 = (x: number) => Math.min(Math.max(x, 0), 1);
 const ease = (x: number) => 1 - Math.pow(1 - clamp01(x), 3);
 
-function drawWheel(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, turn: number, current: Reveal | undefined, revealedCount: number, spinning: boolean) {
+function drawWheel(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, turn: number, current: Reveal | undefined, currentRevealed: boolean, revealedCount: number, spinning: boolean) {
   const cx = x;
   const cy = y;
   const spin = turn * Math.PI / 180;
@@ -82,10 +82,10 @@ function drawWheel(ctx: CanvasRenderingContext2D, x: number, y: number, radius: 
   ctx.stroke();
   ctx.fillStyle = COLORS.white;
   ctx.font = '800 15px Barlow, sans-serif';
-  ctx.fillText(current && revealedCount > 0 ? String(current.team.rank) : 'ZE', cx, cy - 6);
+  ctx.fillText(current && currentRevealed ? String(current.team.rank) : 'ZE', cx, cy - 6);
   ctx.fillStyle = COLORS.yellow;
   ctx.font = '800 11px Barlow, sans-serif';
-  ctx.fillText(current && revealedCount > 0 ? 'RANG' : 'PADEL', cx, cy + 10);
+  ctx.fillText(current && currentRevealed ? 'RANG' : 'PADEL', cx, cy + 10);
 
   ctx.beginPath();
   ctx.moveTo(cx - 16, cy - radius - 23);
@@ -274,7 +274,7 @@ function drawFrame(ctx: CanvasRenderingContext2D, t: number, state: TournamentSt
   ctx.fillText(t >= REVEAL_END ? 'TIRAGE TERMINÉ' : revealActive ? 'EN DIRECT' : 'BIENTÔT', 944, 76);
 
   // Compact wheel: about 210 px diameter.
-  drawWheel(ctx, 151, 274, 101, spinDegrees, current, revealCount, revealActive && local < 0.5);
+  drawWheel(ctx, 151, 274, 101, spinDegrees, current, Boolean(current && visible.has(current.slot)), revealCount, revealActive && local < 0.5);
 
   rounded(ctx, 282, 163, 772, 224, 18);
   ctx.fillStyle = COLORS.white;
