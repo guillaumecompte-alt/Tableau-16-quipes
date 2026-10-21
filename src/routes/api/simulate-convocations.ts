@@ -94,6 +94,28 @@ async function getCampaignId(value: string): Promise<string> {
     .join('');
 }
 
+/** Retry transient network failures with the same request ID. The Apps Script relay
+ * deduplicates accepted requests, so a lost response cannot cause a second email.
+ */
+async function fetchRelayWithRetry(
+  url: string,
+  init: RequestInit,
+  maxAttempts = 3,
+): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 700 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Relais Gmail inaccessible');
+}
+
 export const Route = createFileRoute('/api/simulate-convocations')({
   server: {
     handlers: {
@@ -220,7 +242,7 @@ export const Route = createFileRoute('/api/simulate-convocations')({
           ].join('\n');
 
           try {
-            const relayResponse = await fetch(RELAY_URL, {
+            const relayResponse = await fetchRelayWithRetry(RELAY_URL, {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
               body: JSON.stringify({
