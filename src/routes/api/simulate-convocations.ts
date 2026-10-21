@@ -14,7 +14,7 @@ type Team = {
   time?: unknown;
 };
 type Payload = {
-  batch?: unknown;
+  messageIndex?: unknown;
   teams?: Team[];
   tournament?: {
     tournamentType?: unknown;
@@ -132,10 +132,9 @@ export const Route = createFileRoute('/api/simulate-convocations')({
         const date = cleanText(payload.tournament?.date, 80);
         const referee = cleanText(payload.tournament?.referee, 120);
         const teams = payload.teams;
-        const batch = Number(payload.batch);
-
-        if (batch !== 1 && batch !== 2) {
-          return response({ ok: false, error: 'invalid_batch', message: 'Le lot doit être 1 ou 2.' }, 400);
+        const messageIndex = Number(payload.messageIndex);
+        if (!Number.isInteger(messageIndex) || messageIndex < 0 || messageIndex > 31) {
+          return response({ ok: false, error: 'invalid_message_index', message: 'L’index du message doit être compris entre 0 et 31.' }, 400);
         }
         if (!tournament || !date || !Array.isArray(teams) || teams.length !== 16) {
           return response({
@@ -201,8 +200,8 @@ export const Route = createFileRoute('/api/simulate-convocations')({
           })),
         });
         const campaignId = await getCampaignId(campaignFingerprint);
-        // Send 16 messages per incoming Worker request to stay below redirect subrequest limits.
-        const batchMessages = messages.filter((item) => batch === 1 ? item.rank <= 8 : item.rank >= 9);
+        // One outbound email per Worker invocation keeps the Apps Script redirect well below subrequest limits.
+        const batchMessages = [messages[messageIndex]];
         let sentCount = 0;
         let duplicateCount = 0;
         const errors: string[] = [];
@@ -227,7 +226,7 @@ export const Route = createFileRoute('/api/simulate-convocations')({
           ].join('\n');
 
           try {
-            const relayResponse = await fetchRelayWithRetry(RELAY_URL, {
+            const relayResponse = await fetch(RELAY_URL, {
               method: 'POST',
               headers: { 'content-type': 'application/json' },
               body: JSON.stringify({
@@ -271,7 +270,7 @@ export const Route = createFileRoute('/api/simulate-convocations')({
             sentCount,
             duplicateCount,
             failureCount: errors.length,
-            message: `Le lot ${batch}/2 est partiel.`,
+            message: `Le message ${messageIndex + 1}/32 (paire #${batchMessages[0]?.rank ?? '?'}) est partiel.`,
             issues: errors.slice(0, 10),
           }, 502);
         }
@@ -280,12 +279,12 @@ export const Route = createFileRoute('/api/simulate-convocations')({
           ok: true,
           sentCount,
           duplicateCount,
-          batch,
+          messageIndex,
           toGuillaume: batchMessages.filter((message) => message.testTo === TEST_RECIPIENTS[0]).length,
           toWilliam: batchMessages.filter((message) => message.testTo === TEST_RECIPIENTS[1]).length,
           message: sentCount === 0
-            ? `Lot ${batch}/2 traité : tous les messages étaient déjà enregistrés.`
-            : `Lot ${batch}/2 terminé : ${sentCount} e-mails envoyés.`,
+            ? `Message ${messageIndex + 1}/32 déjà traité. Aucun doublon envoyé.`
+            : `Message ${messageIndex + 1}/32 envoyé.`,
         });
       },
     },
