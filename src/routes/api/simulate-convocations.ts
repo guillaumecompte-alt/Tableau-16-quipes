@@ -15,6 +15,7 @@ type Team = {
 };
 type Payload = {
   messageIndex?: unknown;
+  runId?: unknown;
   teams?: Team[];
   tournament?: {
     tournamentType?: unknown;
@@ -136,6 +137,10 @@ export const Route = createFileRoute('/api/simulate-convocations')({
         if (!Number.isInteger(messageIndex) || messageIndex < 0 || messageIndex > 31) {
           return response({ ok: false, error: 'invalid_message_index', message: 'L’index du message doit être compris entre 0 et 31.' }, 400);
         }
+        const runId = cleanText(payload.runId, 100);
+        if (!/^[A-Za-z0-9_-]{12,100}$/.test(runId)) {
+          return response({ ok: false, error: 'invalid_run_id', message: 'Identifiant de nouvelle campagne invalide.' }, 400);
+        }
         if (!tournament || !date || !Array.isArray(teams) || teams.length !== 16) {
           return response({
             ok: false,
@@ -194,7 +199,7 @@ export const Route = createFileRoute('/api/simulate-convocations')({
 
         messages.sort((a, b) => a.rank - b.rank || a.slot - b.slot);
         const campaignFingerprint = JSON.stringify({
-          tournament, date, referee,
+          runId, tournament, date, referee,
           messages: messages.map(({ rank, slot, player, partner, time, testTo }) => ({
             rank, slot, player, partner, time, testTo,
           })),
