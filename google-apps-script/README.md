@@ -5,8 +5,8 @@ Ce script permet à ZE PADEL de demander à ton compte Google d'envoyer un e-mai
 ## Important
 
 - Ce relais est **verrouillé en mode TEST**.
-- Il n'accepte que `guillaume.compte@gmail.com` et `williamdurand84@gmail.com`.
-- Il limite le test à 10 destinataires par jour.
+- Il accepte uniquement les trois boîtes de test configurées dans `Code.gs` : `guillaume.compte@gmail.com`, `williamdurand84@gmail.com` et `guigui99999@hotmail.com`.
+- Il limite les tests à 80 destinataires par jour au niveau du script ; le quota réel de Google Apps Script reste prioritaire.
 - Il ne prend pas de destinataires en copie.
 - Aucun envoi aux joueurs du tournoi n'est possible avec cette version du script.
 - Ne mets jamais le secret dans GitHub, dans un message ou dans le code de la page web.
@@ -35,7 +35,7 @@ En ouvrant l'URL `/exec` dans le navigateur, une réponse JSON doit indiquer que
 
 ## Quota
 
-Google indique actuellement une limite Apps Script de 100 destinataires d'e-mail par jour pour les comptes personnels Gmail. Le script applique une limite supplémentaire et plus basse de 10 destinataires de test par jour. Les quotas peuvent évoluer : voir [les quotas officiels Apps Script](https://developers.google.com/apps-script/guides/services/quotas).
+Google indique actuellement une limite Apps Script de 100 destinataires d'e-mail par jour pour les comptes personnels Gmail. Le script applique une limite complémentaire de 80 destinataires de test par jour ; la limite effective de Google reste prioritaire. Les quotas peuvent évoluer : voir [les quotas officiels Apps Script](https://developers.google.com/apps-script/guides/services/quotas).
 
 
 ## Activer les convocations réelles — à faire seulement après validation des vraies adresses
@@ -58,4 +58,4 @@ Le relais a une limite indépendante de **40 destinataires réels par jour**, en
 
 ## Simulation de campagne (32 e-mails)
 
-La page Convocations peut envoyer une simulation de 32 messages : les messages du joueur 1 de chaque paire vont à `guillaume.compte@gmail.com`, ceux du joueur 2 vont à `williamdurand84@gmail.com`. Tous les sujets et corps comportent une mention explicite « SIMULATION » ; les adresses de joueurs présentes dans le tournoi sont ignorées. Le relais doit être redéployé avec `MAX_TEST_RECIPIENTS_PER_DAY = 40` pour permettre cette campagne après les tests individuels. Le mode global reste `TEST_ONLY` ; ne crée pas `ZE_PADEL_MODE=PRODUCTION` avant vérification et autorisation explicite.
+La page Convocations peut envoyer une simulation de 32 messages : les messages du joueur 1 de chaque paire vont à `guillaume.compte@gmail.com`, ceux du joueur 2 vont à `williamdurand84@gmail.com`. Tous les sujets et corps comportent une mention explicite « SIMULATION » ; les adresses de joueurs présentes dans le tournoi sont ignorées. Le relais doit être redéployé avec `MAX_TEST_RECIPIENTS_PER_DAY = 80` pour permettre cette campagne après les tests individuels. Le mode global reste `TEST_ONLY` ; ne crée pas `ZE_PADEL_MODE=PRODUCTION` avant vérification et autorisation explicite.
