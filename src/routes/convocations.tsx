@@ -24,6 +24,9 @@ function ConvocationsPage() {
   const [sendingTest, setSendingTest] = useState(false);
   const [testMessage, setTestMessage] = useState('');
   const [testError, setTestError] = useState(false);
+  const [sendingHotmailTest, setSendingHotmailTest] = useState(false);
+  const [hotmailTestMessage, setHotmailTestMessage] = useState('');
+  const [hotmailTestError, setHotmailTestError] = useState(false);
   const [sendingSimulation, setSendingSimulation] = useState(false);
   const [simulationMessage, setSimulationMessage] = useState('');
   const [simulationError, setSimulationError] = useState(false);
@@ -201,6 +204,59 @@ function ConvocationsPage() {
     } finally { setSendingTest(false); }
   }
 
+  async function sendHotmailTest() {
+    const team = state.teams.find((entry) => entry.rank === 1);
+    if (!team || !team.player1.trim() || !team.player2.trim()) {
+      setHotmailTestError(true);
+      setHotmailTestMessage('La paire de rang 1 doit contenir deux noms de joueurs.');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'TEST UNIQUE — envoyer un seul e-mail marqué TEST à guigui99999@hotmail.com ? Aucun e-mail ne sera envoyé aux adresses des joueurs.'
+    );
+    if (!confirmed) return;
+
+    setSendingHotmailTest(true);
+    setHotmailTestError(false);
+    setHotmailTestMessage('Envoi du test unique vers Hotmail en cours…');
+    try {
+      const response = await fetch('/api/test-hotmail', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          team: {
+            rank: team.rank,
+            player1: team.player1,
+            player2: team.player2,
+            time: team.time,
+          },
+          tournament: {
+            tournamentType: state.info?.tournamentType ?? '',
+            date: state.info?.date ?? '',
+            referee: state.info?.referee ?? '',
+          },
+        }),
+      });
+      let result: { ok?: boolean; message?: string } = {};
+      try {
+        result = await response.json() as typeof result;
+      } catch {
+        throw new Error('Le serveur a retourné une réponse inattendue.');
+      }
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || 'Le test vers Hotmail a échoué.');
+      }
+      setHotmailTestMessage(result.message || 'Le relais a accepté un e-mail pour Hotmail. Vérifie la boîte et les indésirables.');
+      setHotmailTestError(false);
+    } catch (error) {
+      setHotmailTestMessage(error instanceof Error ? error.message : 'Impossible d’envoyer le test vers Hotmail.');
+      setHotmailTestError(true);
+    } finally {
+      setSendingHotmailTest(false);
+    }
+  }
+
   function prepareRealPreview() {
     setShowRealPreview(true);
     setRealMessage('');
@@ -307,6 +363,13 @@ function ConvocationsPage() {
           {sendingTest ? 'Envoi en cours…' : 'Envoyer les 2 e-mails de test'}
         </Button>
         {testMessage && <p className={`text-sm mt-3 ${testError ? 'text-destructive' : 'text-muted-foreground'}`} role="status">{testMessage}</p>}
+        <div className="mt-4 border-t pt-4">
+          <p className="text-sm text-muted-foreground mb-3">Test isolé d’une troisième boîte : envoie un seul e-mail marqué « TEST » à guigui99999@hotmail.com. Ce test ne participe pas à la simulation des 32 messages.</p>
+          <Button type="button" variant="outline" onClick={() => void sendHotmailTest()} disabled={busy || sendingHotmailTest}>
+            {sendingHotmailTest ? 'Test Hotmail en cours…' : 'Tester une seule réception sur Hotmail'}
+          </Button>
+          {hotmailTestMessage && <p className={`text-sm whitespace-pre-line mt-3 ${hotmailTestError ? 'text-destructive' : 'text-muted-foreground'}`} role="status">{hotmailTestMessage}</p>}
+        </div>
       </div>
 
       <div className="mb-6 rounded-lg border p-4">
