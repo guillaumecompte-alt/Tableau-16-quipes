@@ -194,4 +194,6 @@ export const Route = createFileRoute('/api/send-convocations')({
           message: 'La réponse du relais n’a pas pu être confirmée. Tu peux reprendre plus tard : le même identifiant empêchera un doublon si le message était déjà accepté.',
         }, 502);
       }
-    }\n  }}\n});\n
+    }
+  }}
+});
