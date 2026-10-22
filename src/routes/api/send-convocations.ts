@@ -116,7 +116,7 @@ export const Route = createFileRoute('/api/send-convocations')({
         '',
         'À bientôt sur les terrains,',
         'ZE PADEL',
-      ].join('\\n');
+      ].join('\n');
 
       try {
         const response = await fetch(RELAY_URL, {
