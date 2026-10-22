@@ -739,15 +739,34 @@ function ConvocationsPage() {
 
       <div className="mb-6 rounded-lg border p-4">
         <h3 className="font-semibold">Envoyer les convocations aux joueurs</h3>
-        <p className="text-sm text-muted-foreground mt-2 mb-3">Avant tout envoi, ZE PADEL vérifie les 16 paires, la date du tournoi, les 32 adresses distinctes et bloque les adresses de test. L’envoi réel nécessite une connexion autorisée, la sauvegarde en ligne et une confirmation finale.</p>
-        <Button type="button" variant="outline" onClick={prepareRealPreview} disabled={busy || sendingReal}>
-          Vérifier les destinataires
-        </Button>
+        <p className="text-sm text-muted-foreground mt-2 mb-3">ZE PADEL compare chaque destinataire à la dernière convocation confirmée dans ce navigateur. Une modification d’heure ou de contenu prépare une mise à jour seulement pour les joueurs concernés ; les autres ne reçoivent rien. Le suivi persiste après fermeture de l’onglet sur ce navigateur et cet appareil. Pour un nouveau tournoi, réinitialise explicitement le suivi.</p>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={prepareRealPreview} disabled={busy || sendingReal}>
+            Vérifier les destinataires
+          </Button>
+          <Button type="button" variant="outline" onClick={resetRealDeliveryHistory} disabled={busy || sendingReal}>
+            Nouveau tournoi : réinitialiser le suivi
+          </Button>
+        </div>
         {showRealPreview && <div className="mt-4 rounded-md bg-muted/40 p-3">
           <p className="text-sm font-medium mb-2">Contrôle avant envoi</p>
           <p className={`text-sm whitespace-pre-line ${realError ? 'text-destructive' : 'text-muted-foreground'}`} role="status">{realMessage}</p>
-          {!realError && <Button type="button" className="mt-3" onClick={() => void sendRealConvocations()} disabled={busy || sendingReal}>
-            {sendingReal ? 'Envoi en cours…' : 'Confirmer et envoyer les 32 convocations'}
+          {realPlan && realPlan.items.length > 0 && !realError && <div className="mt-3">
+            <p className="text-sm font-medium mb-2">
+              ${realPlan.items.length} e-mail(s) à envoyer : {realPlan.initialCount} première(s) convocation(s), {realPlan.updateCount} mise(s) à jour, {realPlan.unchangedCount} destinataire(s) inchangé(s).
+            </p>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              {realPlan.items.slice(0, 12).map((item) => (
+                <li key={item.email}>
+                  Paire #{item.rank} — {item.email} — {item.kind === 'update' ? 'mise à jour' : 'première convocation'}
+                  {item.kind === 'update' && item.previousTime && item.previousTime !== item.time ? ` (heure précédente : ${item.previousTime})` : ''}
+                </li>
+              ))}
+            </ul>
+            {realPlan.items.length > 12 && <p className="text-xs text-muted-foreground mt-2">… et {realPlan.items.length - 12} autre(s) destinataire(s).</p>}
+          </div>}
+          {!realError && realPlan && realPlan.items.length > 0 && <Button type="button" className="mt-3" onClick={() => void sendRealConvocations()} disabled={busy || sendingReal}>
+            {sendingReal ? 'Envoi en cours…' : `Confirmer et envoyer ${realPlan.items.length} e-mail(s)`}
           </Button>}
         </div>}
       </div>
@@ -755,9 +774,9 @@ function ConvocationsPage() {
       <div className="table-scroll"><table className="teams-table"><thead><tr><th>Rang</th><th>Joueurs</th><th>E-mail joueur 1</th><th>E-mail joueur 2</th><th>Heure de convocation</th></tr></thead>
       <tbody>{state.teams.map(team => <tr key={team.rank}>
         <td>{team.rank}</td><td><strong>{team.player1 || 'Joueur 1 à renseigner'} / {team.player2 || 'Joueur 2 à renseigner'}</strong></td>
-        <td><input aria-label={`E-mail joueur 1, paire ${team.rank}`} type="email" value={team.email1 ?? ''} onChange={e => { update({ ...state, teams: state.teams.map(t => t.rank === team.rank ? { ...t, email1: e.target.value } : t) }); setShowRealPreview(false); setRealMessage(''); }} disabled={busy} placeholder="joueur1@exemple.fr" /></td>
-        <td><input aria-label={`E-mail joueur 2, paire ${team.rank}`} type="email" value={team.email2 ?? ''} onChange={e => { update({ ...state, teams: state.teams.map(t => t.rank === team.rank ? { ...t, email2: e.target.value } : t) }); setShowRealPreview(false); setRealMessage(''); }} disabled={busy} placeholder="joueur2@exemple.fr" /></td>
-        <td><input aria-label={`Heure de convocation, paire ${team.rank}`} value={team.time} onChange={e => { update({ ...state, teams: state.teams.map(t => t.rank === team.rank ? { ...t, time: e.target.value } : t) }); setShowRealPreview(false); setRealMessage(''); }} disabled={busy} placeholder="Ex. 09:30" /></td>
+        <td><input aria-label={`E-mail joueur 1, paire ${team.rank}`} type="email" value={team.email1 ?? ''} onChange={e => { update({ ...state, teams: state.teams.map(t => t.rank === team.rank ? { ...t, email1: e.target.value } : t) }); setShowRealPreview(false); setRealPlan(null); setRealMessage(''); }} disabled={busy} placeholder="joueur1@exemple.fr" /></td>
+        <td><input aria-label={`E-mail joueur 2, paire ${team.rank}`} type="email" value={team.email2 ?? ''} onChange={e => { update({ ...state, teams: state.teams.map(t => t.rank === team.rank ? { ...t, email2: e.target.value } : t) }); setShowRealPreview(false); setRealPlan(null); setRealMessage(''); }} disabled={busy} placeholder="joueur2@exemple.fr" /></td>
+        <td><input aria-label={`Heure de convocation, paire ${team.rank}`} value={team.time} onChange={e => { update({ ...state, teams: state.teams.map(t => t.rank === team.rank ? { ...t, time: e.target.value } : t) }); setShowRealPreview(false); setRealPlan(null); setRealMessage(''); }} disabled={busy} placeholder="Ex. 09:30" /></td>
       </tr>)}</tbody></table></div>
     </section>
   </TournamentShell>;
