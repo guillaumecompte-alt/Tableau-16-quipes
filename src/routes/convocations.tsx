@@ -753,7 +753,7 @@ function ConvocationsPage() {
           <p className={`text-sm whitespace-pre-line ${realError ? 'text-destructive' : 'text-muted-foreground'}`} role="status">{realMessage}</p>
           {realPlan && realPlan.items.length > 0 && !realError && <div className="mt-3">
             <p className="text-sm font-medium mb-2">
-              ${realPlan.items.length} e-mail(s) à envoyer : {realPlan.initialCount} première(s) convocation(s), {realPlan.updateCount} mise(s) à jour, {realPlan.unchangedCount} destinataire(s) inchangé(s).
+              {realPlan.items.length} e-mail(s) à envoyer : {realPlan.initialCount} première(s) convocation(s), {realPlan.updateCount} mise(s) à jour, {realPlan.unchangedCount} destinataire(s) inchangé(s).
             </p>
             <ul className="text-sm text-muted-foreground space-y-1">
               {realPlan.items.slice(0, 12).map((item) => (
