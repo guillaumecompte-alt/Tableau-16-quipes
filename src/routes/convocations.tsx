@@ -431,19 +431,25 @@ function ConvocationsPage() {
           player: person.player, partner: person.partner, email: person.email, time: team.time,
         });
         const sentRecord = history.sent[person.email];
+        const oldPendingRecord = history.pending[person.email];
 
-        if (sentRecord?.signature === signature) {
+        if (
+          sentRecord?.signature === signature &&
+          (!oldPendingRecord || oldPendingRecord.signature === signature)
+        ) {
           delete history.pending[person.email];
           unchangedCount += 1;
           continue;
         }
 
-        let pendingRecord = history.pending[person.email];
+        let pendingRecord = oldPendingRecord;
         if (!pendingRecord || pendingRecord.signature !== signature) {
           pendingRecord = {
             signature,
             requestId: crypto.randomUUID(),
-            kind: sentRecord ? 'update' : 'initial',
+            // If a different message was left unconfirmed, re-send the current
+            // version as an update because that older version may have arrived.
+            kind: (sentRecord || oldPendingRecord) ? 'update' : 'initial',
             rank: team.rank,
             time: team.time.trim(),
             player: person.player,
