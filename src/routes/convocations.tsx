@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 const TEST_RECIPIENTS = new Set([
   'guillaume.compte@gmail.com',
   'williamdurand84@gmail.com',
+  'guigui99999@hotmail.com',
 ]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SIMULATION_RUN_STORAGE_KEY = 'ze-padel-simulation-run-id-v1';
@@ -640,11 +641,11 @@ function ConvocationsPage() {
             result = await response.json() as typeof result;
           } catch {
             errors.push(`${item.email} : réponse serveur inattendue. La tentative reste en attente.`);
-            continue;
+            break;
           }
         } catch {
           errors.push(`${item.email} : réponse non reçue. La même tentative sera réutilisée lors de la reprise.`);
-          continue;
+          break;
         }
 
         const wasSent = result.sentEmails?.includes(item.email) === true;
@@ -676,8 +677,17 @@ function ConvocationsPage() {
         }
 
         errors.push(`${item.email} : ${result.message || 'envoi non confirmé'}`);
-        if (result.error === 'gmail_daily_quota_reached' || result.error === 'daily_limit_reached') {
-          errors.push('Arrêt automatique : le quota d’envoi est atteint. Les destinataires restants restent en attente.');
+        const quotaReached = result.error === 'gmail_daily_quota_reached' || result.error === 'daily_limit_reached';
+        const nonRetryableRequest = response.status === 400 || response.status === 401 ||
+          response.status === 403 || response.status === 503 ||
+          result.error === 'production_mode_not_enabled' ||
+          result.error === 'server_not_configured' ||
+          result.error === 'sender_not_authorized' ||
+          result.error === 'authentication_required';
+        if (quotaReached || nonRetryableRequest) {
+          errors.push(quotaReached
+            ? 'Arrêt automatique : le quota d’envoi est atteint. Les destinataires restants restent en attente.'
+            : 'Arrêt automatique : le serveur a bloqué l’envoi. Les destinataires restants restent en attente.');
           break;
         }
       }
