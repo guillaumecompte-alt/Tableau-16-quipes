@@ -29,6 +29,7 @@ type RealPendingRecord = {
   signature: string;
   requestId: string;
   kind: RealSendKind;
+  attempted?: boolean;
   rank: number;
   time: string;
   player: string;
@@ -449,7 +450,7 @@ function ConvocationsPage() {
             requestId: crypto.randomUUID(),
             // If a different message was left unconfirmed, re-send the current
             // version as an update because that older version may have arrived.
-            kind: (sentRecord || oldPendingRecord) ? 'update' : 'initial',
+            kind: (sentRecord || oldPendingRecord?.attempted === true) ? 'update' : 'initial',
             rank: team.rank,
             time: team.time.trim(),
             player: person.player,
@@ -603,6 +604,19 @@ function ConvocationsPage() {
         if (!item) continue;
         setRealMessage(`Envoi ${index + 1}/${plan.items.length} — paire #${item.rank}, ${item.email}…`);
 
+        // Persist that this exact email attempt is about to be sent. If the network
+        // response is lost, keep the same request ID so Apps Script can deduplicate a retry.
+        const attemptRecord = created.history.pending[item.email];
+        if (!attemptRecord || attemptRecord.requestId !== item.requestId) {
+          errors.push(`${item.email} : le suivi de la tentative a changé. Envoi arrêté par sécurité.`);
+          break;
+        }
+        attemptRecord.attempted = true;
+        if (!writeRealDeliveryHistory(created.history)) {
+          errors.push(`${item.email} : impossible d’enregistrer la tentative. Envoi arrêté pour éviter un doublon.`);
+          break;
+        }
+
         let response: Response;
         let result: {
           ok?: boolean;
@@ -684,6 +698,19 @@ function ConvocationsPage() {
 
         errors.push(`${item.email} : ${result.message || 'envoi non confirmé'}`);
         const quotaReached = result.error === 'gmail_daily_quota_reached' || result.error === 'daily_limit_reached';
+        const definitelyRejected = quotaReached || response.status === 400 ||
+          response.status === 401 || response.status === 403 ||
+          result.error === 'production_mode_not_enabled' ||
+          result.error === 'server_not_configured' ||
+          result.error === 'sender_not_authorized' ||
+          result.error === 'authentication_required';
+        if (definitelyRejected) {
+          const pending = created.history.pending[item.email];
+          if (pending?.requestId === item.requestId) {
+            pending.attempted = false;
+            writeRealDeliveryHistory(created.history);
+          }
+        }
         const nonRetryableRequest = response.status === 400 || response.status === 401 ||
           response.status === 403 || response.status === 503 ||
           result.error === 'production_mode_not_enabled' ||
