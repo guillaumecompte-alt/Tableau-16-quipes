@@ -11,6 +11,7 @@ const TEST_RECIPIENTS = new Set([
   'williamdurand84@gmail.com',
 ]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SIMULATION_RUN_STORAGE_KEY = 'ze-padel-simulation-run-id-v1';
 
 export const Route = createFileRoute('/convocations')({
   head: () => ({ meta: [{ title: 'ZE PADEL · Convocations' }, { name: 'description', content: 'Préparer les horaires de convocation et vérifier les e-mails des joueurs.' }] }),
@@ -77,11 +78,24 @@ function ConvocationsPage() {
     setSimulationError(false);
     setSimulationMessage('Envoi de la simulation en cours… Ne ferme pas cette page.');
 
-    // Reuse the same run ID after a partial failure so accepted messages are deduplicated.
-    // A completed campaign clears it; the next explicit test then gets a fresh run ID
-    // and can resend all 32 messages, even if old test emails were deleted from Gmail.
-    const runId = simulationRunId ?? crypto.randomUUID();
+    // Persist the campaign ID so closing or refreshing the tab does not lose resume safety.
+    // If storage is unavailable, keep the in-memory fallback.
+    let storedRunId: string | null = null;
+    try {
+      storedRunId = window.localStorage.getItem(SIMULATION_RUN_STORAGE_KEY);
+    } catch {
+      // Browser storage may be disabled; the in-memory fallback still works for this tab.
+    }
+    const candidateRunId = simulationRunId ?? storedRunId;
+    const runId = candidateRunId && /^[A-Za-z0-9_-]{12,100}$/.test(candidateRunId)
+      ? candidateRunId
+      : crypto.randomUUID();
     setSimulationRunId(runId);
+    try {
+      window.localStorage.setItem(SIMULATION_RUN_STORAGE_KEY, runId);
+    } catch {
+      // Continue with the in-memory ID when persistent storage is unavailable.
+    }
 
     try {
       const payload = {
@@ -144,7 +158,7 @@ function ConvocationsPage() {
 
       if (sendErrors.length > 0) {
         setSimulationMessage(
-          `Simulation partielle : ${sentCount} nouveaux e-mails acceptés, ${duplicateCount} déjà traités.\\n${sendErrors.join('\\n')}`
+          `Simulation partielle : ${sentCount} nouveaux e-mails acceptés, ${duplicateCount} déjà traités.\n${sendErrors.join('\n')}`
         );
         setSimulationError(true);
       } else {
@@ -153,6 +167,13 @@ function ConvocationsPage() {
         );
         setSimulationError(false);
         setSimulationRunId(null);
+        try {
+          if (window.localStorage.getItem(SIMULATION_RUN_STORAGE_KEY) === runId) {
+            window.localStorage.removeItem(SIMULATION_RUN_STORAGE_KEY);
+          }
+        } catch {
+          // A stale ID in storage is harmless; the next successful run can replace it.
+        }
       }
     } catch (error) {
       setSimulationMessage(error instanceof Error ? error.message : 'Impossible de terminer la simulation.');
