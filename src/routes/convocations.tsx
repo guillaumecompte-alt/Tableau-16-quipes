@@ -498,16 +498,9 @@ function ConvocationsPage() {
     setRealPlan(null);
     setRealMessage('');
     setRealError(false);
-    if (!user) {
-      setRealError(true);
-      setRealMessage('Connecte-toi avec le compte expéditeur autorisé pour préparer un envoi réel.');
-      return;
-    }
-    if (dirty) {
-      setRealError(true);
-      setRealMessage('Les modifications ne sont pas encore enregistrées en ligne. Clique sur « Enregistrer en ligne », puis recommence.');
-      return;
-    }
+
+    // Read-only preview works in local mode too. Login and online save are
+    // still mandatory inside sendRealConvocations before any real message.
     const issues = realEmailIssues();
     if (issues.length) {
       setRealError(true);
@@ -523,11 +516,20 @@ function ConvocationsPage() {
     }
 
     setRealPlan(created.plan);
+    const sendPrerequisiteNote = !user
+      ? ' Aperçu local uniquement : connecte-toi au compte expéditeur autorisé et enregistre le tournoi en ligne avant tout envoi.'
+      : dirty
+        ? ' Aperçu uniquement : enregistre les modifications en ligne avant tout envoi.'
+        : '';
     if (created.plan.items.length === 0) {
-      setRealMessage('Aucune convocation à envoyer : les 32 destinataires correspondent déjà aux dernières convocations confirmées. Aucun e-mail n’a été envoyé.');
+      setRealMessage(
+        'Aucune convocation à envoyer : les 32 destinataires correspondent aux dernières convocations confirmées. Aucun e-mail n’a été envoyé.' +
+        sendPrerequisiteNote
+      );
     } else {
       setRealMessage(
-        `Préparation terminée : ${created.plan.items.length} e-mail(s) à envoyer — ${created.plan.initialCount} première(s) convocation(s), ${created.plan.updateCount} mise(s) à jour. ${created.plan.unchangedCount} destinataire(s) sont déjà à jour. Aucun e-mail n’a encore été envoyé.`
+        `Aperçu prêt : ${created.plan.items.length} e-mail(s) à envoyer — ${created.plan.initialCount} première(s) convocation(s), ${created.plan.updateCount} mise(s) à jour. ${created.plan.unchangedCount} destinataire(s) sont déjà à jour. Aucun e-mail n’a été envoyé.` +
+        sendPrerequisiteNote
       );
     }
   }
@@ -808,7 +810,7 @@ function ConvocationsPage() {
             </ul>
             {realPlan.items.length > 12 && <p className="text-xs text-muted-foreground mt-2">… et {realPlan.items.length - 12} autre(s) destinataire(s).</p>}
           </div>}
-          {!realError && realPlan && realPlan.items.length > 0 && <Button type="button" className="mt-3" onClick={() => void sendRealConvocations()} disabled={busy || sendingReal}>
+          {!realError && realPlan && realPlan.items.length > 0 && user && !dirty && <Button type="button" className="mt-3" onClick={() => void sendRealConvocations()} disabled={busy || sendingReal}>
             {sendingReal ? 'Envoi en cours…' : `Confirmer et envoyer ${realPlan.items.length} e-mail(s)`}
           </Button>}
         </div>}
