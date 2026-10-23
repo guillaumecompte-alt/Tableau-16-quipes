@@ -3,7 +3,12 @@
 import { createLovableAuth } from "@lovable.dev/cloud-auth-js";
 import type { OAuthProvider } from "@lovable.dev/cloud-auth-js";
 import { supabase } from "../supabase/client";
-const lovableAuth = createLovableAuth();
+// Use Lovable's hosted OAuth broker explicitly: this app is deployed on Cloudflare Workers,
+// so the relative default /~oauth/initiate would resolve on the Worker and return 404.
+const lovableAuth = createLovableAuth({
+  oauthBrokerUrl: "https://oauth.lovable.app/initiate?project_id=90c8575f-3a07-43e5-8693-bc5fb59fbb7b&project_env=prod",
+  supportedOAuthOrigins: ["https://oauth.lovable.app", "https://lovable.dev"],
+});
 
 type SignInOptions = {
   redirect_uri?: string;

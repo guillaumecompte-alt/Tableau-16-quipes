@@ -9,9 +9,99 @@ import { supabase } from '@/integrations/supabase/client';
 const TEST_RECIPIENTS = new Set([
   'guillaume.compte@gmail.com',
   'williamdurand84@gmail.com',
+  'guigui99999@hotmail.com',
 ]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SIMULATION_RUN_STORAGE_KEY = 'ze-padel-simulation-run-id-v1';
+
+const REAL_SEND_HISTORY_STORAGE_KEY = 'ze-padel-real-send-history-v1';
+
+type RealSendKind = 'initial' | 'update';
+type RealSentRecord = {
+  signature: string;
+  sentAt: string;
+  rank: number;
+  time: string;
+  player: string;
+  partner: string;
+};
+type RealPendingRecord = {
+  signature: string;
+  requestId: string;
+  kind: RealSendKind;
+  attempted?: boolean;
+  rank: number;
+  time: string;
+  player: string;
+  partner: string;
+};
+type RealDeliveryHistory = {
+  version: 1;
+  sent: Record<string, RealSentRecord>;
+  pending: Record<string, RealPendingRecord>;
+};
+type PlannedRealRecipient = {
+  email: string;
+  signature: string;
+  requestId: string;
+  kind: RealSendKind;
+  rank: number;
+  time: string;
+  player: string;
+  partner: string;
+  previousTime?: string;
+};
+type RealSendPlan = {
+  items: PlannedRealRecipient[];
+  unchangedCount: number;
+  initialCount: number;
+  updateCount: number;
+  totalCount: number;
+};
+
+function readRealDeliveryHistory(): RealDeliveryHistory | null {
+  try {
+    const raw = window.localStorage.getItem(REAL_SEND_HISTORY_STORAGE_KEY);
+    if (!raw) return { version: 1, sent: {}, pending: {} };
+    const parsed = JSON.parse(raw) as Partial<RealDeliveryHistory>;
+    if (parsed.version !== 1 || !parsed.sent || typeof parsed.sent !== 'object' ||
+        !parsed.pending || typeof parsed.pending !== 'object') return null;
+    return { version: 1, sent: parsed.sent, pending: parsed.pending };
+  } catch {
+    return null;
+  }
+}
+
+function writeRealDeliveryHistory(history: RealDeliveryHistory): boolean {
+  try {
+    window.localStorage.setItem(REAL_SEND_HISTORY_STORAGE_KEY, JSON.stringify(history));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function realRecipientSignature(input: {
+  tournamentType: string;
+  date: string;
+  referee: string;
+  rank: number;
+  player: string;
+  partner: string;
+  email: string;
+  time: string;
+}): string {
+  return JSON.stringify({
+    tournamentType: input.tournamentType.trim(),
+    date: input.date.trim(),
+    referee: input.referee.trim(),
+    rank: input.rank,
+    player: input.player.trim(),
+    partner: input.partner.trim(),
+    email: input.email.trim().toLowerCase(),
+    time: input.time.trim(),
+  });
+}
 
 export const Route = createFileRoute('/convocations')({
   head: () => ({ meta: [{ title: 'ZE PADEL · Convocations' }, { name: 'description', content: 'Préparer les horaires de convocation et vérifier les e-mails des joueurs.' }] }),
@@ -36,6 +126,7 @@ function ConvocationsPage() {
   const [sendingReal, setSendingReal] = useState(false);
   const [realMessage, setRealMessage] = useState('');
   const [realError, setRealError] = useState(false);
+  const [realPlan, setRealPlan] = useState<RealSendPlan | null>(null);
 
   // Simulation campaigns are sent in bounded batches to respect Worker subrequest limits.
   async function sendSimulationCampaign() {
@@ -313,27 +404,151 @@ function ConvocationsPage() {
     }
   }
 
+  function createRealSendPlan():
+    | { ok: true; history: RealDeliveryHistory; plan: RealSendPlan }
+    | { ok: false; message: string } {
+    const history = readRealDeliveryHistory();
+    if (!history) {
+      return {
+        ok: false,
+        message: 'Le suivi d’envoi local est inaccessible ou illisible. Ne lance pas d’envoi avant d’avoir vérifié le stockage du navigateur.',
+      };
+    }
+
+    const tournamentType = state.info?.tournamentType.trim() ?? '';
+    const date = state.info?.date.trim() ?? '';
+    const referee = state.info?.referee.trim() ?? '';
+    const items: PlannedRealRecipient[] = [];
+    let unchangedCount = 0;
+
+    for (const team of [...state.teams].sort((a, b) => a.rank - b.rank)) {
+      const players = [
+        { player: team.player1.trim(), partner: team.player2.trim(), email: (team.email1 ?? '').trim().toLowerCase() },
+        { player: team.player2.trim(), partner: team.player1.trim(), email: (team.email2 ?? '').trim().toLowerCase() },
+      ];
+      for (const person of players) {
+        const signature = realRecipientSignature({
+          tournamentType, date, referee, rank: team.rank,
+          player: person.player, partner: person.partner, email: person.email, time: team.time,
+        });
+        const sentRecord = history.sent[person.email];
+        const oldPendingRecord = history.pending[person.email];
+
+        if (
+          sentRecord?.signature === signature &&
+          (!oldPendingRecord || oldPendingRecord.signature === signature)
+        ) {
+          delete history.pending[person.email];
+          unchangedCount += 1;
+          continue;
+        }
+
+        let pendingRecord = oldPendingRecord;
+        if (!pendingRecord || pendingRecord.signature !== signature) {
+          pendingRecord = {
+            signature,
+            requestId: crypto.randomUUID(),
+            // If a different message was left unconfirmed, re-send the current
+            // version as an update because that older version may have arrived.
+            kind: (sentRecord || oldPendingRecord?.attempted === true) ? 'update' : 'initial',
+            rank: team.rank,
+            time: team.time.trim(),
+            player: person.player,
+            partner: person.partner,
+          };
+          history.pending[person.email] = pendingRecord;
+        }
+
+        items.push({
+          email: person.email,
+          signature,
+          requestId: pendingRecord.requestId,
+          kind: pendingRecord.kind,
+          rank: team.rank,
+          time: team.time.trim(),
+          player: person.player,
+          partner: person.partner,
+          previousTime: sentRecord?.time,
+        });
+      }
+    }
+
+    if (!writeRealDeliveryHistory(history)) {
+      return {
+        ok: false,
+        message: 'Impossible de sauvegarder le suivi d’envoi dans ce navigateur. Pour éviter les doublons, aucun e-mail ne sera envoyé.',
+      };
+    }
+
+    return {
+      ok: true,
+      history,
+      plan: {
+        items,
+        unchangedCount,
+        initialCount: items.filter((item) => item.kind === 'initial').length,
+        updateCount: items.filter((item) => item.kind === 'update').length,
+        totalCount: 32,
+      },
+    };
+  }
+
   function prepareRealPreview() {
     setShowRealPreview(true);
+    setRealPlan(null);
     setRealMessage('');
     setRealError(false);
-    if (!user) {
-      setRealError(true);
-      setRealMessage('Connecte-toi avec le compte expéditeur autorisé pour préparer un envoi réel.');
-      return;
-    }
-    if (dirty) {
-      setRealError(true);
-      setRealMessage('Les modifications ne sont pas encore enregistrées en ligne. Clique sur « Enregistrer en ligne », puis recommence.');
-      return;
-    }
+
+    // Read-only preview works in local mode too. Login and online save are
+    // still mandatory inside sendRealConvocations before any real message.
     const issues = realEmailIssues();
     if (issues.length) {
       setRealError(true);
       setRealMessage(issues.join('\n'));
       return;
     }
-    setRealMessage('Vérification locale réussie : 32 destinataires uniques. Aucun e-mail n’a été envoyé. Vérifie la liste puis confirme séparément pour lancer la campagne.');
+
+    const created = createRealSendPlan();
+    if (!created.ok) {
+      setRealError(true);
+      setRealMessage(created.message);
+      return;
+    }
+
+    setRealPlan(created.plan);
+    const sendPrerequisiteNote = !user
+      ? ' Aperçu local uniquement : connecte-toi au compte expéditeur autorisé et enregistre le tournoi en ligne avant tout envoi.'
+      : dirty
+        ? ' Aperçu uniquement : enregistre les modifications en ligne avant tout envoi.'
+        : '';
+    if (created.plan.items.length === 0) {
+      setRealMessage(
+        'Aucune convocation à envoyer : les 32 destinataires correspondent aux dernières convocations confirmées. Aucun e-mail n’a été envoyé.' +
+        sendPrerequisiteNote
+      );
+    } else {
+      setRealMessage(
+        `Aperçu prêt : ${created.plan.items.length} e-mail(s) à envoyer — ${created.plan.initialCount} première(s) convocation(s), ${created.plan.updateCount} mise(s) à jour. ${created.plan.unchangedCount} destinataire(s) sont déjà à jour. Aucun e-mail n’a été envoyé.` +
+        sendPrerequisiteNote
+      );
+    }
+  }
+
+  function resetRealDeliveryHistory() {
+    const confirmed = window.confirm(
+      'Réinitialiser le suivi local des convocations ? À utiliser uniquement pour démarrer un nouveau tournoi. La prochaine vérification considérera les destinataires actuels comme n’ayant jamais reçu de convocation et pourra donc préparer jusqu’à 32 nouveaux e-mails.'
+    );
+    if (!confirmed) return;
+    try {
+      window.localStorage.removeItem(REAL_SEND_HISTORY_STORAGE_KEY);
+      setRealPlan(null);
+      setShowRealPreview(true);
+      setRealError(false);
+      setRealMessage('Suivi réinitialisé dans ce navigateur. Vérifie les destinataires pour préparer la première campagne du nouveau tournoi. Aucun e-mail n’a été envoyé.');
+    } catch {
+      setRealError(true);
+      setRealMessage('Impossible de réinitialiser le suivi dans le navigateur. Aucun e-mail n’a été envoyé.');
+    }
   }
 
   async function sendRealConvocations() {
@@ -353,56 +568,186 @@ function ConvocationsPage() {
       setRealMessage(issues.join('\n'));
       return;
     }
+
+    const created = createRealSendPlan();
+    if (!created.ok) {
+      setRealError(true);
+      setRealMessage(created.message);
+      return;
+    }
+    const { plan } = created;
+    setRealPlan(plan);
+    if (plan.items.length === 0) {
+      setRealError(false);
+      setRealMessage('Aucun envoi nécessaire : tous les destinataires sont déjà à jour. Aucun e-mail n’a été envoyé.');
+      return;
+    }
+
     const confirmed = window.confirm(
-      'CONFIRMATION FINALE : envoyer maintenant 32 e-mails réels, un à chaque joueur, aux adresses affichées dans ZE PADEL ? Cette action ne peut pas être annulée.'
+      `CONFIRMATION FINALE : envoyer ${plan.items.length} e-mail(s) aux joueurs ? ${plan.initialCount} première(s) convocation(s), ${plan.updateCount} mise(s) à jour ; ${plan.unchangedCount} destinataire(s) ne recevront rien car leur convocation est inchangée. Les messages seront envoyés un par un et suivis individuellement.`
     );
     if (!confirmed) return;
 
     setSendingReal(true);
     setRealError(false);
-    setRealMessage('Contrôle de sécurité et envoi en cours…');
+    let sentInitial = 0;
+    let sentUpdates = 0;
+    let duplicateCount = 0;
+    let confirmedCount = 0;
+    const errors: string[] = [];
+
     try {
       const { data, error: sessionError } = await supabase.auth.getSession();
       const accessToken = data.session?.access_token;
       if (sessionError || !accessToken) throw new Error('Ta session a expiré. Reconnecte-toi.');
-      const response = await fetch('/api/send-convocations', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          teams: state.teams.map((team) => ({
-            rank: team.rank,
-            player1: team.player1,
-            player2: team.player2,
-            email1: team.email1,
-            email2: team.email2,
-            time: team.time,
-          })),
-          info: {
-            tournamentType: state.info?.tournamentType ?? '',
-            date: state.info?.date ?? '',
-            referee: state.info?.referee ?? '',
-          },
-        }),
-      });
-      let result: {
-        ok?: boolean; error?: string; sentCount?: number; duplicateCount?: number;
-        message?: string; issues?: string[];
-      } = {};
-      try { result = await response.json() as typeof result; }
-      catch { throw new Error('Le serveur a retourné une réponse inattendue.'); }
-      if (!response.ok || !result.ok) {
-        const detail = result.issues?.length ? '\n' + result.issues.join('\n') : '';
-        throw new Error((result.message || 'L’envoi réel est bloqué.') + detail);
+
+      for (let index = 0; index < plan.items.length; index += 1) {
+        const item = plan.items[index];
+        if (!item) continue;
+        setRealMessage(`Envoi ${index + 1}/${plan.items.length} — paire #${item.rank}, ${item.email}…`);
+
+        // Persist that this exact email attempt is about to be sent. If the network
+        // response is lost, keep the same request ID so Apps Script can deduplicate a retry.
+        const attemptRecord = created.history.pending[item.email];
+        if (!attemptRecord || attemptRecord.requestId !== item.requestId) {
+          errors.push(`${item.email} : le suivi de la tentative a changé. Envoi arrêté par sécurité.`);
+          break;
+        }
+        attemptRecord.attempted = true;
+        if (!writeRealDeliveryHistory(created.history)) {
+          errors.push(`${item.email} : impossible d’enregistrer la tentative. Envoi arrêté pour éviter un doublon.`);
+          break;
+        }
+
+        let response: Response;
+        let result: {
+          ok?: boolean;
+          error?: string;
+          status?: string;
+          sentCount?: number;
+          duplicateCount?: number;
+          sentEmails?: string[];
+          duplicateEmails?: string[];
+          failedEmails?: string[];
+          message?: string;
+          issues?: string[];
+        } = {};
+
+        try {
+          response = await fetch('/api/send-convocations', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              targetEmail: item.email,
+              requestId: item.requestId,
+              sendKind: item.kind,
+              teams: state.teams.map((team) => ({
+                rank: team.rank,
+                player1: team.player1,
+                player2: team.player2,
+                email1: team.email1,
+                email2: team.email2,
+                time: team.time,
+              })),
+              info: {
+                tournamentType: state.info?.tournamentType ?? '',
+                date: state.info?.date ?? '',
+                referee: state.info?.referee ?? '',
+              },
+            }),
+          });
+          try {
+            result = await response.json() as typeof result;
+          } catch {
+            errors.push(`${item.email} : réponse serveur inattendue. La tentative reste en attente.`);
+            break;
+          }
+        } catch {
+          errors.push(`${item.email} : réponse non reçue. La même tentative sera réutilisée lors de la reprise.`);
+          break;
+        }
+
+        const wasSent = result.sentEmails?.includes(item.email) === true;
+        const wasDuplicate = result.duplicateEmails?.includes(item.email) === true;
+        if (wasSent || wasDuplicate) {
+          created.history.sent[item.email] = {
+            signature: item.signature,
+            sentAt: new Date().toISOString(),
+            rank: item.rank,
+            time: item.time,
+            player: item.player,
+            partner: item.partner,
+          };
+          if (created.history.pending[item.email]?.requestId === item.requestId) {
+            delete created.history.pending[item.email];
+          }
+          const persisted = writeRealDeliveryHistory(created.history);
+          if (!persisted) {
+            errors.push(`${item.email} : envoi confirmé, mais l’historique local n’a pas pu être sauvegardé. Le même identifiant protège la reprise contre un nouvel envoi.`);
+          }
+          if (wasSent) {
+            confirmedCount += 1;
+            if (item.kind === 'update') sentUpdates += 1;
+            else sentInitial += 1;
+          } else {
+            duplicateCount += 1;
+          }
+          continue;
+        }
+
+        errors.push(`${item.email} : ${result.message || 'envoi non confirmé'}`);
+        const quotaReached = result.error === 'gmail_daily_quota_reached' || result.error === 'daily_limit_reached';
+        const definitelyRejected = quotaReached || response.status === 400 ||
+          response.status === 401 || response.status === 403 ||
+          result.error === 'production_mode_not_enabled' ||
+          result.error === 'server_not_configured' ||
+          result.error === 'sender_not_authorized' ||
+          result.error === 'authentication_required';
+        if (definitelyRejected) {
+          const pending = created.history.pending[item.email];
+          if (pending?.requestId === item.requestId) {
+            pending.attempted = false;
+            writeRealDeliveryHistory(created.history);
+          }
+        }
+        const nonRetryableRequest = response.status === 400 || response.status === 401 ||
+          response.status === 403 || response.status === 503 ||
+          result.error === 'production_mode_not_enabled' ||
+          result.error === 'server_not_configured' ||
+          result.error === 'sender_not_authorized' ||
+          result.error === 'authentication_required';
+        if (quotaReached || nonRetryableRequest) {
+          errors.push(quotaReached
+            ? 'Arrêt automatique : le quota d’envoi est atteint. Les destinataires restants restent en attente.'
+            : 'Arrêt automatique : le serveur a bloqué l’envoi. Les destinataires restants restent en attente.');
+          break;
+        }
       }
-      setRealMessage(result.message || `Envoi confirmé : ${result.sentCount ?? 0} e-mails acceptés par Gmail.`);
-      setRealError(false);
+
+      const next = createRealSendPlan();
+      if (next.ok) setRealPlan(next.plan);
+
+      if (errors.length > 0) {
+        const remaining = next.ok ? next.plan.items.length : Math.max(0, plan.items.length - confirmedCount - duplicateCount);
+        setRealMessage(
+          `Envoi partiel : ${sentInitial} nouvelle(s) convocation(s), ${sentUpdates} mise(s) à jour envoyée(s), ${duplicateCount} déjà acceptée(s) précédemment. ${remaining} destinataire(s) restent à vérifier.\n${errors.join('\n')}`
+        );
+        setRealError(true);
+      } else {
+        setRealMessage(
+          `Traitement terminé : ${sentInitial} première(s) convocation(s), ${sentUpdates} mise(s) à jour, ${duplicateCount} message(s) déjà accepté(s) lors d’une tentative précédente ; ${next.ok ? next.plan.unchangedCount : plan.unchangedCount} destinataire(s) n’ont rien reçu car leur convocation est inchangée.`
+        );
+        setRealError(false);
+      }
     } catch (error) {
       setRealMessage(error instanceof Error ? error.message : 'Impossible de terminer l’envoi réel.');
       setRealError(true);
-    } finally { setSendingReal(false); }
+    } finally {
+      setSendingReal(false);
+    }
   }
 
   return <TournamentShell>
@@ -439,15 +784,34 @@ function ConvocationsPage() {
 
       <div className="mb-6 rounded-lg border p-4">
         <h3 className="font-semibold">Envoyer les convocations aux joueurs</h3>
-        <p className="text-sm text-muted-foreground mt-2 mb-3">Avant tout envoi, ZE PADEL vérifie les 16 paires, la date du tournoi, les 32 adresses distinctes et bloque les adresses de test. L’envoi réel nécessite une connexion autorisée, la sauvegarde en ligne et une confirmation finale.</p>
-        <Button type="button" variant="outline" onClick={prepareRealPreview} disabled={busy || sendingReal}>
-          Vérifier les destinataires
-        </Button>
+        <p className="text-sm text-muted-foreground mt-2 mb-3">ZE PADEL compare chaque destinataire à la dernière convocation confirmée dans ce navigateur. Une modification d’heure ou de contenu prépare une mise à jour seulement pour les joueurs concernés ; les autres ne reçoivent rien. Le suivi persiste après fermeture de l’onglet sur ce navigateur et cet appareil. Pour un nouveau tournoi, réinitialise explicitement le suivi.</p>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={prepareRealPreview} disabled={busy || sendingReal}>
+            Vérifier les destinataires
+          </Button>
+          <Button type="button" variant="outline" onClick={resetRealDeliveryHistory} disabled={busy || sendingReal}>
+            Nouveau tournoi : réinitialiser le suivi
+          </Button>
+        </div>
         {showRealPreview && <div className="mt-4 rounded-md bg-muted/40 p-3">
           <p className="text-sm font-medium mb-2">Contrôle avant envoi</p>
           <p className={`text-sm whitespace-pre-line ${realError ? 'text-destructive' : 'text-muted-foreground'}`} role="status">{realMessage}</p>
-          {!realError && <Button type="button" className="mt-3" onClick={() => void sendRealConvocations()} disabled={busy || sendingReal}>
-            {sendingReal ? 'Envoi en cours…' : 'Confirmer et envoyer les 32 convocations'}
+          {realPlan && realPlan.items.length > 0 && !realError && <div className="mt-3">
+            <p className="text-sm font-medium mb-2">
+              {realPlan.items.length} e-mail(s) à envoyer : {realPlan.initialCount} première(s) convocation(s), {realPlan.updateCount} mise(s) à jour, {realPlan.unchangedCount} destinataire(s) inchangé(s).
+            </p>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              {realPlan.items.slice(0, 12).map((item) => (
+                <li key={item.email}>
+                  Paire #{item.rank} — {item.email} — {item.kind === 'update' ? 'mise à jour' : 'première convocation'}
+                  {item.kind === 'update' && item.previousTime && item.previousTime !== item.time ? ` (heure précédente : ${item.previousTime})` : ''}
+                </li>
+              ))}
+            </ul>
+            {realPlan.items.length > 12 && <p className="text-xs text-muted-foreground mt-2">… et {realPlan.items.length - 12} autre(s) destinataire(s).</p>}
+          </div>}
+          {!realError && realPlan && realPlan.items.length > 0 && user && !dirty && <Button type="button" className="mt-3" onClick={() => void sendRealConvocations()} disabled={busy || sendingReal}>
+            {sendingReal ? 'Envoi en cours…' : `Confirmer et envoyer ${realPlan.items.length} e-mail(s)`}
           </Button>}
         </div>}
       </div>
@@ -455,9 +819,9 @@ function ConvocationsPage() {
       <div className="table-scroll"><table className="teams-table"><thead><tr><th>Rang</th><th>Joueurs</th><th>E-mail joueur 1</th><th>E-mail joueur 2</th><th>Heure de convocation</th></tr></thead>
       <tbody>{state.teams.map(team => <tr key={team.rank}>
         <td>{team.rank}</td><td><strong>{team.player1 || 'Joueur 1 à renseigner'} / {team.player2 || 'Joueur 2 à renseigner'}</strong></td>
-        <td><input aria-label={`E-mail joueur 1, paire ${team.rank}`} type="email" value={team.email1 ?? ''} onChange={e => { update({ ...state, teams: state.teams.map(t => t.rank === team.rank ? { ...t, email1: e.target.value } : t) }); setShowRealPreview(false); setRealMessage(''); }} disabled={busy} placeholder="joueur1@exemple.fr" /></td>
-        <td><input aria-label={`E-mail joueur 2, paire ${team.rank}`} type="email" value={team.email2 ?? ''} onChange={e => { update({ ...state, teams: state.teams.map(t => t.rank === team.rank ? { ...t, email2: e.target.value } : t) }); setShowRealPreview(false); setRealMessage(''); }} disabled={busy} placeholder="joueur2@exemple.fr" /></td>
-        <td><input aria-label={`Heure de convocation, paire ${team.rank}`} value={team.time} onChange={e => { update({ ...state, teams: state.teams.map(t => t.rank === team.rank ? { ...t, time: e.target.value } : t) }); setShowRealPreview(false); setRealMessage(''); }} disabled={busy} placeholder="Ex. 09:30" /></td>
+        <td><input aria-label={`E-mail joueur 1, paire ${team.rank}`} type="email" value={team.email1 ?? ''} onChange={e => { update({ ...state, teams: state.teams.map(t => t.rank === team.rank ? { ...t, email1: e.target.value } : t) }); setShowRealPreview(false); setRealPlan(null); setRealMessage(''); }} disabled={busy} placeholder="joueur1@exemple.fr" /></td>
+        <td><input aria-label={`E-mail joueur 2, paire ${team.rank}`} type="email" value={team.email2 ?? ''} onChange={e => { update({ ...state, teams: state.teams.map(t => t.rank === team.rank ? { ...t, email2: e.target.value } : t) }); setShowRealPreview(false); setRealPlan(null); setRealMessage(''); }} disabled={busy} placeholder="joueur2@exemple.fr" /></td>
+        <td><input aria-label={`Heure de convocation, paire ${team.rank}`} value={team.time} onChange={e => { update({ ...state, teams: state.teams.map(t => t.rank === team.rank ? { ...t, time: e.target.value } : t) }); setShowRealPreview(false); setRealPlan(null); setRealMessage(''); }} disabled={busy} placeholder="Ex. 09:30" /></td>
       </tr>)}</tbody></table></div>
     </section>
   </TournamentShell>;

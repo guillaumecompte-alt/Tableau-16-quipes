@@ -2,7 +2,6 @@ import { Link, useLocation } from '@tanstack/react-router';
 import { useRef, useState, type ReactNode } from 'react';
 import { GitBranch, Users, Trophy, CalendarClock, CircleDot, Shuffle, LogOut, Save, X, CalendarDays, MapPin, ArrowUpRight, Download, Upload, ClipboardList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { lovable } from '@/integrations/lovable';
 import { supabase } from '@/integrations/supabase/client';
 import { useTournament } from './use-tournament';
 import court from '@/assets/padel-court.jpg';
@@ -19,7 +18,15 @@ export function TournamentShell({ children }: { children: ReactNode }) {
     ? new Date(state.info.date + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
     : 'Date à définir';
   const nav = [{ to: '/' as const, title: 'Tableau du tournoi', icon: GitBranch }, { to: '/equipes' as const, title: 'Équipes', icon: Users }, { to: '/convocations' as const, title: 'Convocations', icon: CalendarClock }, { to: '/informations' as const, title: 'Informations du tournoi', icon: ClipboardList }, { to: '/classement' as const, title: 'Classement', icon: Trophy }];
-  async function signIn(provider: 'google' | 'lovable') { const result = await lovable.auth.signInWithOAuth(provider, { redirect_uri: window.location.origin }); if (result.error) setAuthError('Connexion impossible. Veuillez réessayer.'); else setLogin(false); }
+  async function signInWithGoogle() {
+    setAuthError('');
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+    if (error) setAuthError('Connexion Google impossible : vérifie la configuration Google dans Supabase, puis réessaie.');
+    else setLogin(false);
+  }
   return <div className="app-layout">
     <aside className="app-sidebar">
       <Link to="/" className="brand"><span className="brand-symbol"><CircleDot size={24} /></span><span>ZE <span className="text-lime">PADEL</span><small>GESTION DES TOURNOIS</small></span></Link>
@@ -52,6 +59,6 @@ export function TournamentShell({ children }: { children: ReactNode }) {
       {children}
       <footer className="app-footer"><span>Ze Padel · {state.info?.tournamentType.trim() || "Tournoi"} · 16 équipes</span><span>Entrée échelonnée <ArrowUpRight size={13} /></span></footer></main>
     </div>
-    {login && <div className="modal-backdrop" onClick={() => setLogin(false)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="login-title" onClick={e => e.stopPropagation()}><Button variant="ghost" size="icon" className="modal-close" aria-label="Fermer" onClick={() => setLogin(false)}><X /></Button><span className="modal-eyebrow">VOTRE ESPACE TOURNOI</span><h2 id="login-title">Retrouvez votre tournoi</h2><p className="text-muted-foreground text-sm mb-6">Connectez-vous pour enregistrer vos équipes, le tirage et les résultats.</p><Button className="w-full mb-3" onClick={() => signIn('google')}>Continuer avec Google</Button><Button className="w-full" variant="outline" onClick={() => signIn('lovable')}>Continuer avec Lovable</Button>{authError && <p className="text-destructive mt-4" role="alert">{authError}</p>}</section></div>}
+    {login && <div className="modal-backdrop" onClick={() => setLogin(false)}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="login-title" onClick={e => e.stopPropagation()}><Button variant="ghost" size="icon" className="modal-close" aria-label="Fermer" onClick={() => setLogin(false)}><X /></Button><span className="modal-eyebrow">VOTRE ESPACE TOURNOI</span><h2 id="login-title">Retrouvez votre tournoi</h2><p className="text-muted-foreground text-sm mb-6">Connectez-vous avec le compte Google autorisé pour enregistrer vos équipes, le tirage et les résultats.</p><Button className="w-full mb-3" onClick={() => void signInWithGoogle()}>Continuer avec Google</Button>{authError && <p className="text-destructive mt-4" role="alert">{authError}</p>}</section></div>}
   </div>;
 }
